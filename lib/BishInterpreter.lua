@@ -99,6 +99,18 @@ local function runCommandNode(node, tEnv, shell)
             end
 
             curNode = curNode.pipeOut.command
+        elseif curNode.filePipeOut then
+            local fname = curNode.filePipeOut
+            local writeType
+            if curNode.filePipeOutAppend then
+                writeType = "a"
+            else
+                writeType = "w"
+            end
+
+            stdout = grin.assert(fs.open(fname, writeType), "File could not be opened: " .. fname, 0)
+            stdout.isPiped = true
+            curNode = nil
         else
             stdout = {writeLine=print,write=write,close=function()end}
             curNode = nil

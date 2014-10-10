@@ -4,6 +4,7 @@ local function pfunc(f)
     end
 end
 
+local operatorChars = "|>"
 local function lexer(sProgram)
     local lex = {}
     lex.t = {}
@@ -47,9 +48,13 @@ local function lexer(sProgram)
                 end
                 lex.nextc() -- skip trailing quote
                 return "TK_STRING", s
-            elseif c == "|" then
-                lex.nextc()
-                return "|", "|"
+            elseif operatorChars:find(c, 1, true) then
+                local s = ""
+                repeat
+                    s = s .. c
+                    lex.nextc()
+                until not operatorChars:find(c, 1, true)
+                return s, s
             else
                 local s = c
                 lex.nextc()
@@ -148,7 +153,7 @@ local function parser(lex, emit)
     end
 
     function parse.command()
-        -- command -> TK_STRING {commandArgs} {|command}
+        -- command -> TK_STRING {commandArgs} {pipe}
         local cmd = parse.checkString()
         emit.beginCommand(cmd)
 
@@ -156,14 +161,25 @@ local function parser(lex, emit)
             parse.commandArgs()
         end
 
-        if parse.testNext("|") then
+        if parse.test("|") or parse.test(">") or parse.test(">>") then
             --pipe
-            emit.beginPipeOut()
-            parse.command()
-            emit.finishPipeOut()
+            parse.pipe()
         end
 
         emit.finishCommand()
+    end
+
+    function parse.pipe()
+        -- pipe -> PIPE command | FILEPIPE fileName
+        if parse.testNext("|") then
+            emit.beginPipeOut()
+            parse.command()
+            emit.finishPipeOut()
+        elseif parse.testNext(">") then
+            emit.filePipeOut(parse.checkString())
+        elseif parse.testNext(">>") then
+            emit.filePipeOut(parse.checkString(), true)
+        end
     end
 
     function parse.commandArgs()
@@ -231,6 +247,12 @@ local function emitter()
     function emit.finishPipeOut()
         local outCommand = emit.popNode()
         emit.node.pipeOut  = outCommand
+    end
+
+    -- File pipe out
+    function emit.filePipeOut(fileName, append)
+        emit.node.filePipeOut = fileName
+        emit.node.filePipeOutAppend = append
     end
 
     -- Array elements
