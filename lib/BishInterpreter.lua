@@ -38,7 +38,7 @@ local function runCommandNode(node, tEnv, shell)
     local cmds = {}
 
     local stdin = {readLine=read,close=function()end}
-    local stderr = {write=write,close=function()end}
+    local stderr = {write=write,flush=function()end,close=function()end}
     function stderr.writeLine(...)
         if term.isColor() then
             term.setTextColor(colors.red)
@@ -112,7 +112,7 @@ local function runCommandNode(node, tEnv, shell)
             stdout.isPiped = true
             curNode = nil
         else
-            stdout = {writeLine=print,write=write,close=function()end}
+            stdout = {writeLine=print,write=write,flush=function()end,close=function()end}
             curNode = nil
         end
         local program = grin.assert(shell.resolveProgram(thisNode.command[1]), "No such program", 0)
@@ -136,13 +136,20 @@ local function runCommandNode(node, tEnv, shell)
             if tFilters[cmd] == nil or tFilters[cmd] == tEvent[1] or tEvent[1] == "terminate" then
                 local oldPrint, oldWrite,   oldRead,    oldStdout,  oldStdin,   oldStderr,  oldPrintError
                     = print,    write,      read,       _G.stdout,  _G.stdin,   _G.stderr,  _G.printError
-                _G.print = cmd.stdout.writeLine
+                function _G.print(...)
+                    local lines = cmd.stdout.writeLine(...)
+                    cmd.stdout.flush()
+                    return lines
+                end
                 _G.write = cmd.stdout.write
                 _G.read = cmd.stdin.readLine
                 _G.stdout = cmd.stdout
                 _G.stdin = cmd.stdin
                 _G.stderr = cmd.stderr
-                _G.printError = cmd.stderr.writeLine
+                function _G.printError(...)
+                    cmd.stderr.writeLine(...)
+                    cmd.stderr.flush()
+                end
                 shell.pushRunningProgram(cmd.program)
                 local ok, param = coroutine.resume(cmd.command, unpack(tEvent))
                 shell.popRunningProgram()
