@@ -1,21 +1,13 @@
 do
     local oldRead = read
     function _G.read(rep, history)
-        local ret, timer
+        local ret
         parallel.waitForAny(function()
             ret = oldRead(rep, history)
         end, function()
-            while true do
-                local e, param = os.pullEvent()
-                if e == "key" and param == keys.d then
-                    timer = os.startTimer(0)
-                elseif e == "char" and param:lower() == "d" then
-                    timer = nil
-                elseif e == "timer" and param == timer then
-                    print()
-                    return
-                end
-            end
+            local ctrlKeys = grin.getPackageAPI(__package, "ctrlKeys")
+            ctrlKeys.waitFor("d")
+            print()
         end)
         return ret
     end
