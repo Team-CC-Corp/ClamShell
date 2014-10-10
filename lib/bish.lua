@@ -7,7 +7,12 @@ end
 local tokenNameMap = {
     TK_NEWLINE = ";",
     TK_STRING = "string",
-    TK_IF = "if"
+    TK_IF = "if",
+    ["|"] = "|",
+    [">"] = ">",
+    [">>"] = ">>",
+    ["{"] = "{",
+    ["}"] = "}"
 }
 
 local nameTokenMap = {}
@@ -59,22 +64,24 @@ local function lexer(sProgram)
                 end
                 lex.nextc() -- skip trailing quote
                 return "TK_STRING", s
-            elseif symbolChars:find(c, 1, true) then
-                local s = ""
-                repeat
-                    s = s .. c
-                    lex.nextc()
-                until not symbolChars:find(c, 1, true)
-                return s, s
             else
                 local s = c
                 lex.nextc()
-                while not (c:find("[%s;]") or symbolChars:find(c, 1, true) or c == "EOF") do
-                    if c == "\\" then
-                        c = lex.nextc()
+                if symbolChars:find(s, 1, true) then
+                    -- symbol
+                    while symbolChars:find(c, 1, true) do
+                        s = s .. c
+                        lex.nextc()
                     end
-                    s = s .. c
-                    lex.nextc()
+                    grin.assert(nameTokenMap[s], "Unknown token: " .. s, 0)
+                else
+                    while not (c:find("[%s;]") or symbolChars:find(c, 1, true) or c == "EOF") do
+                        if c == "\\" then
+                            c = lex.nextc()
+                        end
+                        s = s .. c
+                        lex.nextc()
+                    end
                 end
 
                 if nameTokenMap[s] then
@@ -183,7 +190,7 @@ local function parser(lex, emit)
         local cmd = parse.checkString()
         emit.beginCommand(cmd)
 
-        if not parse.commandFollow() then
+        if parse.test("TK_STRING") then
             parse.commandArgs()
         end
 
@@ -212,13 +219,9 @@ local function parser(lex, emit)
         -- commandArgs -> TK_STRING {commandArgs}
         local arg = parse.checkString()
         emit.addArgument(arg)
-        if not parse.commandFollow() then
+        if parse.test("TK_STRING") then
             parse.commandArgs()
         end
-    end
-
-    function parse.commandFollow()
-        return parse.test("TK_NEWLINE") or parse.test("}") or parse.test("{")
     end
 
     function parse.ifStat()
