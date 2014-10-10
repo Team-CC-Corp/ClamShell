@@ -4,6 +4,7 @@ local parentShell = shell
 local parentTerm = term.current()
 local clamPkg = grin.packageFromExecutable(parentShell.getRunningProgram())
 local bish = grin.getPackageAPI(clamPkg, "bish")
+local BishInterpreter = grin.getPackageAPI(clamPkg, "BishInterpreter")
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
 
 if multishell then
