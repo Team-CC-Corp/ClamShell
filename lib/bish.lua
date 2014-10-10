@@ -4,7 +4,18 @@ local function pfunc(f)
     end
 end
 
-local operatorChars = "|>"
+local tokenNameMap = {
+    TK_NEWLINE = ";",
+    TK_STRING = "string",
+    TK_IF = "if"
+}
+
+local nameTokenMap = {}
+for k,v in pairs(tokenNameMap) do
+    nameTokenMap[v] = k
+end
+
+local symbolChars = "|>{}"
 local function lexer(sProgram)
     local lex = {}
     lex.t = {}
@@ -48,23 +59,28 @@ local function lexer(sProgram)
                 end
                 lex.nextc() -- skip trailing quote
                 return "TK_STRING", s
-            elseif operatorChars:find(c, 1, true) then
+            elseif symbolChars:find(c, 1, true) then
                 local s = ""
                 repeat
                     s = s .. c
                     lex.nextc()
-                until not operatorChars:find(c, 1, true)
+                until not symbolChars:find(c, 1, true)
                 return s, s
             else
                 local s = c
                 lex.nextc()
-                while not (c:find("[%s;|]") or c == "EOF") do
+                while not (c:find("[%s;]") or symbolChars:find(c, 1, true) or c == "EOF") do
                     if c == "\\" then
                         c = lex.nextc()
                     end
                     s = s .. c
                     lex.nextc()
                 end
+
+                if nameTokenMap[s] then
+                    return nameTokenMap[s], s
+                end
+
                 return "TK_STRING", s
             end
         end
@@ -94,8 +110,12 @@ local function parser(lex, emit)
         error(msg .. " near " .. lex.t.data, level)
     end
 
+    function parse.check(token)
+        parse.assert(parse.test(token), "Expected "..(tokenNameMap[token] or token), 0)
+    end
+
     function parse.checkNext(token)
-        parse.assert(parse.test(token), "Unexpected token", 0)
+        parse.check(token)
         lex.next()
     end
 
@@ -113,7 +133,7 @@ local function parser(lex, emit)
     end
 
     function parse.checkString()
-        parse.assert(parse.test("TK_STRING"), "Expected string", 0)
+        parse.check("TK_STRING")
         local s = lex.t.data
         lex.next()
         return s
@@ -130,7 +150,7 @@ local function parser(lex, emit)
         while parse.testNext("TK_NEWLINE") do
         end
 
-        while not parse.test("EOF") do
+        while not parse.chunkFollow() do
             emit.beginArrayElement()
             parse.statement()
             emit.finishArrayElement()
@@ -145,10 +165,16 @@ local function parser(lex, emit)
         emit.finishChunk()
     end
 
+    function parse.chunkFollow()
+        return parse.test("EOF") or parse.test("}")
+    end
+
     function parse.statement()
         -- statement -> command
         if parse.test("TK_STRING") then
             parse.command()
+        elseif parse.test("TK_IF") then
+            parse.ifStat()
         end
     end
 
@@ -157,7 +183,7 @@ local function parser(lex, emit)
         local cmd = parse.checkString()
         emit.beginCommand(cmd)
 
-        if parse.test("TK_STRING") then
+        if not parse.commandFollow() then
             parse.commandArgs()
         end
 
@@ -186,9 +212,24 @@ local function parser(lex, emit)
         -- commandArgs -> TK_STRING {commandArgs}
         local arg = parse.checkString()
         emit.addArgument(arg)
-        if parse.test("TK_STRING") then
+        if not parse.commandFollow() then
             parse.commandArgs()
         end
+    end
+
+    function parse.commandFollow()
+        return parse.test("TK_NEWLINE") or parse.test("}") or parse.test("{")
+    end
+
+    function parse.ifStat()
+        -- ifStat -> TK_IF command OPEN_CURLY_BRACKET chunk CLOSE_CURLY_BRACKET
+        parse.checkNext("TK_IF") -- skip if
+        emit.beginIf()
+        parse.command()
+        parse.checkNext("{")
+        parse.chunk()
+        parse.checkNext("}")
+        emit.finishIf()
     end
 
     return parse
@@ -235,7 +276,7 @@ local function emitter()
 
     function emit.finishCommand()
         local command = emit.popNode()
-        emit.node.command = command
+        emit.node.statement = command
     end
 
     -- Pipe out
@@ -264,6 +305,17 @@ local function emitter()
     function emit.finishArrayElement()
         local elem = emit.popNode()
         table.insert(emit.node, elem)
+    end
+
+    -- If control
+    function emit.beginIf()
+        emit.pushNode()
+        emit.node.type = "if_stat"
+    end
+
+    function emit.finishIf()
+        local ifStat = emit.popNode()
+        emit.node.statement = ifStat
     end
 
     return emit

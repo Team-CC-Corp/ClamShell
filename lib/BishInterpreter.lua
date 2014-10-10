@@ -34,7 +34,7 @@ local function run(tEnv, shell, program, ...)
     end
 end
 
-local function runCommandNode(node, tEnv, shell)
+function runCommand(node, tEnv, shell)
     local cmds = {}
 
     local stdin = {readLine=read,close=function()end}
@@ -80,6 +80,8 @@ local function runCommandNode(node, tEnv, shell)
                 return nLines
             end
 
+            function stdout.flush() end
+
             function stdout.close()
                 table.insert(lines, CLOSE)
                 os.queueEvent("clamshell_pipeline_buffer_update")
@@ -98,7 +100,7 @@ local function runCommandNode(node, tEnv, shell)
             function next_stdin.close()
             end
 
-            curNode = curNode.pipeOut.command
+            curNode = curNode.pipeOut.statement
         elseif curNode.filePipeOut then
             local fname = curNode.filePipeOut
             local writeType
@@ -184,17 +186,30 @@ local function runCommandNode(node, tEnv, shell)
     return true
 end
 
+function runIfStat(node, tEnv, shell)
+    if runCommand(node.statement, tEnv, shell) then
+        return runChunk(node.chunk, tEnv, shell)
+    end
+    return true
+end
+
+function runChunk(node, tEnv, shell)
+    for i,v in ipairs(node) do
+        if not runNode(v.statement, tEnv, shell) then
+            return false
+        end
+    end
+    return true
+end
+
 function runNode(node, tEnv, shell)
     if node.type == "root" then
         return runNode(node.chunk, tEnv, shell)
     elseif node.type == "chunk" then
-        for i,v in ipairs(node) do
-            if not runNode(v.command, tEnv, shell) then
-                return false
-            end
-        end
-        return true
+        return runChunk(node, tEnv, shell)
     elseif node.type == "command" then
-        return runCommandNode(node, tEnv, shell)
+        return runCommand(node, tEnv, shell)
+    elseif node.type == "if_stat" then
+        return runIfStat(node, tEnv, shell)
     end
 end
