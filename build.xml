@@ -1,0 +1,41 @@
+<project name="CLAMSHELL" default="main">
+    <condition property="is_windows">
+        <os family="windows"/>
+    </condition>
+    <condition property="is_unix">
+        <os family="unix" />
+    </condition>
+
+    <target name="make_archive">
+        <copy todir="build/clamshell/bin">
+            <fileset dir="bin" />
+        </copy>
+        <copy todir="build/clamshell/lib">
+            <fileset dir="lib" />
+        </copy>
+        <copy todir="build/clamshell/tools">
+            <fileset dir="tools" />
+        </copy>
+        <zip zip64Mode="never" destfile="build/clamshell.zip" basedir="build/clamshell" />
+    </target>
+
+    <target name="if_windows" if="is_windows" depends="make_archive">
+        <exec executable="certutil">
+            <arg value="-encode" />
+            <arg value="build/clamshell.zip" />
+            <arg value="build/clamshell.zip.base64" />
+        </exec>
+    </target>
+
+    <target name="if_unix" if="is_unix" depends="make_archive">
+        <exec executable="base64">
+            <arg value="-i" />
+            <arg value="build/clamshell.zip" />
+            <arg value="-o" />
+            <arg value="build/clamshell.zip.base64" />
+        </exec>
+    </target>
+
+    <target name="main" depends="if_windows, if_unix">
+    </target>
+</project>
