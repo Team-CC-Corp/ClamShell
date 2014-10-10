@@ -1,10 +1,9 @@
 do
     local oldRead = read
-    function _G.read(...)
-        local args = {...}
+    function _G.read(rep, history)
         local ret, timer
         parallel.waitForAny(function()
-            ret = oldRead(unpack(args))
+            ret = oldRead(rep, history)
         end, function()
             while true do
                 local e, param = os.pullEvent()
