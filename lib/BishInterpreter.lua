@@ -55,7 +55,7 @@ function runCommand(node, tEnv, shell)
         local stdout, next_stdin
         local cmd = {}
         for i,v in ipairs(curNode.command) do
-            local s = v:gsub("%$[%a_][%w_]*", function(w)
+            local s = v:gsub("%$([%a_][%w_]*)", function(w)
                 return shell.getenv(w) or ""
             end)
             table.insert(cmd, s)

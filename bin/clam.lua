@@ -177,7 +177,20 @@ function shell.version()
     return "ClamShell 1.0"
 end
 
-local environmentVariables = {}
+local environmentVariables
+if parentShell and parentShell.getEnvironmentVariables then
+    environmentVariables = parentShell.getEnvironmentVariables()
+else
+    environmentVariables = {}
+end
+function shell.getEnvironmentVariables()
+    local copy = {}
+    for k,v in pairs(environmentVariables) do
+        copy[k] = v
+    end
+    return copy
+end
+
 function shell.getenv(name)
     grin.expect("string", name)
     return environmentVariables[name]
