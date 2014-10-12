@@ -53,7 +53,14 @@ function runCommand(node, tEnv, shell)
 
     while curNode do
         local stdout, next_stdin
-        local thisNode = curNode
+        local cmd = {}
+        for i,v in ipairs(curNode.command) do
+            local s = v:gsub("%$[%a_][%w_]*", function(w)
+                return shell.getenv(w) or ""
+            end)
+            table.insert(cmd, s)
+        end
+
         if curNode.pipeOut then
             local lineBuffer = ""
             local lines = {}
@@ -117,10 +124,10 @@ function runCommand(node, tEnv, shell)
             stdout = {writeLine=print,write=write,flush=function()end,close=function()end}
             curNode = nil
         end
-        local program = grin.assert(shell.resolveProgram(thisNode.command[1]), "No such program", 0)
+        local program = grin.assert(shell.resolveProgram(cmd[1]), "No such program", 0)
         table.insert(cmds, {
             command = coroutine.create(function()
-                return run(tEnv, shell, program, unpack(thisNode.command, 2))
+                return run(tEnv, shell, program, unpack(cmd, 2))
             end),
             program = program,
             stdin = stdin,
@@ -202,6 +209,16 @@ function runChunk(node, tEnv, shell)
     return true
 end
 
+function runAssignment(node, tEnv, shell)
+    if not (node.name and node.value) then
+        printError("Invalid assignment")
+        return false
+    end
+
+    shell.setenv(node.name, node.value)
+    return true
+end
+
 function runNode(node, tEnv, shell)
     if node.type == "root" then
         return runNode(node.chunk, tEnv, shell)
@@ -211,5 +228,7 @@ function runNode(node, tEnv, shell)
         return runCommand(node, tEnv, shell)
     elseif node.type == "if_stat" then
         return runIfStat(node, tEnv, shell)
+    elseif node.type == "assignment" then
+        return runAssignment(node, tEnv, shell)
     end
 end

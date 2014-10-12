@@ -177,6 +177,18 @@ function shell.version()
     return "ClamShell 1.0"
 end
 
+local environmentVariables = {}
+function shell.getenv(name)
+    grin.expect("string", name)
+    return environmentVariables[name]
+end
+
+function shell.setenv(name, value)
+    grin.expect("string", name)
+    grin.expect("string", value)
+    environmentVariables[name] = value
+end
+
 if multishell then
     function shell.openTab( ... )
         return multishell.launch(tEnv, "rom/programs/shell", clamPath, table.concat({...}," "))

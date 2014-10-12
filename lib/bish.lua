@@ -12,7 +12,8 @@ local tokenNameMap = {
     [">"] = ">",
     [">>"] = ">>",
     ["{"] = "{",
-    ["}"] = "}"
+    ["}"] = "}",
+    ["="] = "="
 }
 
 local nameTokenMap = {}
@@ -20,7 +21,7 @@ for k,v in pairs(tokenNameMap) do
     nameTokenMap[v] = k
 end
 
-local symbolChars = "|>{}"
+local symbolChars = "|>{}="
 local function lexer(sProgram)
     local lex = {}
     lex.t = {}
@@ -95,10 +96,12 @@ local function lexer(sProgram)
 
     function lex.next()
         local token, data = lex._next()
-        lex.t = {token=token, data=data}
+        lex.t = lex.lookahead
+        lex.lookahead = {token=token, data=data}
     end
 
     lex.nextc()
+    lex.next() -- fill the first lookahead
     return lex
 end
 
@@ -137,6 +140,10 @@ local function parser(lex, emit)
         else
             return false
         end
+    end
+
+    function parse.testLookahead(token)
+        return lex.lookahead.token == token
     end
 
     function parse.checkString()
@@ -179,7 +186,11 @@ local function parser(lex, emit)
     function parse.statement()
         -- statement -> command
         if parse.test("TK_STRING") then
-            parse.command()
+            if parse.testLookahead("=") then
+                parse.assignment()
+            else
+                parse.command()
+            end
         elseif parse.test("TK_IF") then
             parse.ifStat()
         end
@@ -233,6 +244,13 @@ local function parser(lex, emit)
         parse.chunk()
         parse.checkNext("}")
         emit.finishIf()
+    end
+
+    function parse.assignment()
+        emit.beginAssignment(parse.checkString())
+        parse.checkNext("=")
+        emit.assignmentValue(parse.checkString())
+        emit.finishAssignment()
     end
 
     return parse
@@ -319,6 +337,22 @@ local function emitter()
     function emit.finishIf()
         local ifStat = emit.popNode()
         emit.node.statement = ifStat
+    end
+
+    -- Assignment
+    function emit.beginAssignment(name)
+        emit.pushNode()
+        emit.node.type = "assignment"
+        emit.node.name = name
+    end
+
+    function emit.assignmentValue(val)
+        emit.node.value = val
+    end
+
+    function emit.finishAssignment()
+        local assignment = emit.popNode()
+        emit.node.statement = assignment
     end
 
     return emit
