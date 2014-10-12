@@ -13,8 +13,8 @@ end
 
 local bExit = false
 local sDir = (parentShell and parentShell.dir()) or ""
-local sPath = grin.getFromPackage(clamPkg, "tools") .. ":"
-    .. ((parentShell and parentShell.path()) or ".:/rom/programs")
+local sPath = ".:" .. grin.getFromPackage(clamPkg, "tools") .. ":"
+    .. ((parentShell and parentShell.path()) or "/rom/programs")
 local tAliases = (parentShell and parentShell.aliases()) or {}
 tAliases.sh = "clam"
 tAliases.shell = "clam"
