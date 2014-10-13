@@ -4,31 +4,38 @@ local parser = argparse.new()
 parser
     :argument"pattern"
 parser
-    :argument"file"
+    :argument"files"
+    :count"*"
 
 local options = parser:parse({}, ...)
 if not options then
     return
 end
 
-assert(options.pattern, "Usage: glep <pattern> [file]")
+assert(options.pattern, "Usage: glep <pattern> [files]")
 
-local fh
-if options.file then
-    fh = grin.assert(fs.open(shell.resolve(options.file), "r"), "File not found: " .. options.file, 0)
+local files
+if options.files and #options.files > 0 then
+    files = {}
+    for i,v in ipairs(options.files) do
+        fh = grin.assert(fs.open(shell.resolve(v), "r"), "File not found: " .. v, 0)
+        table.insert(files, fh)
+    end
 else
-    fh = stdin
+    files = {stdin}
 end
 
-while true do
-    local line = fh.readLine()
-    if not line then
-        break
+for i,fh in ipairs(files) do
+    while true do
+        local line = fh.readLine()
+        if not line then
+            break
+        end
+
+        if line:find(options.pattern) then
+            print(line)
+        end
     end
 
-    if line:find(options.pattern) then
-        print(line)
-    end
+    fh.close()
 end
-
-fh.close()
