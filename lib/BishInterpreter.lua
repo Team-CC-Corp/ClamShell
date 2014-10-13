@@ -16,14 +16,13 @@ end
 
 
 local function run(tEnv, shell, program, ...)
-    if loadfile(program) then
-        return os.run(tEnv, program, ...)
-    else
+    if program:find("%.sh$") then
         local bish = grin.getPackageAPI(__package, "bish")
         local fh = assert(fs.open(program, "r"), "No such program")
         local text = fh.readAll()
         fh.close()
         local f = assert(bish.compile(tEnv, shell, text))
+
         local ok, err = f(...)
         if not ok then
             printError(err)
@@ -31,6 +30,8 @@ local function run(tEnv, shell, program, ...)
         else
             return err
         end
+    else
+        return os.run(tEnv, program, ...)
     end
 end
 
