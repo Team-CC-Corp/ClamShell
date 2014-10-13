@@ -8,6 +8,7 @@ local tokenNameMap = {
     TK_NEWLINE = ";",
     TK_STRING = "string",
     TK_IF = "if",
+    TK_ELSE = "else",
     ["|"] = "|",
     [">"] = ">",
     [">>"] = ">>",
@@ -236,14 +237,33 @@ local function parser(lex, emit)
     end
 
     function parse.ifStat()
-        -- ifStat -> TK_IF command OPEN_CURLY_BRACKET chunk CLOSE_CURLY_BRACKET
+        -- ifStat -> TK_IF command '{' chunk '}' [elseStat]
         parse.checkNext("TK_IF") -- skip if
         emit.beginIf()
         parse.command()
         parse.checkNext("{")
         parse.chunk()
         parse.checkNext("}")
+        if parse.test("TK_ELSE") then
+            parse.elseStat()
+        end
         emit.finishIf()
+    end
+
+    function parse.elseStat()
+        -- elseStat -> TK_ELSE (ifStat | '{' chunk '}')
+        parse.checkNext("TK_ELSE")
+        emit.beginElse()
+
+        if parse.test("TK_IF") then
+            parse.ifStat()
+        else
+            parse.checkNext("{")
+            parse.chunk()
+            parse.checkNext("}")
+        end
+
+        emit.finishElse()
     end
 
     function parse.assignment()
@@ -337,6 +357,16 @@ local function emitter()
     function emit.finishIf()
         local ifStat = emit.popNode()
         emit.node.statement = ifStat
+    end
+
+    function emit.beginElse()
+        emit.pushNode()
+        emit.node.type = "else_stat"
+    end
+
+    function emit.finishElse()
+        local elseStat = emit.popNode()
+        emit.node.elseStat = elseStat
     end
 
     -- Assignment

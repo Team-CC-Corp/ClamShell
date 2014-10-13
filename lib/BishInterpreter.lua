@@ -197,8 +197,18 @@ end
 function runIfStat(node, tEnv, shell)
     if runCommand(node.statement, tEnv, shell) then
         return runChunk(node.chunk, tEnv, shell)
+    elseif node.elseStat then
+        return runNode(node.elseStat, tEnv, shell)
     end
     return true
+end
+
+function runElseStat(node, tEnv, shell)
+    if node.statement then
+        runNode(node.statement, tEnv, shell)
+    else
+        runNode(node.chunk, tEnv, shell)
+    end
 end
 
 function runChunk(node, tEnv, shell)
@@ -229,6 +239,8 @@ function runNode(node, tEnv, shell)
         return runCommand(node, tEnv, shell)
     elseif node.type == "if_stat" then
         return runIfStat(node, tEnv, shell)
+    elseif node.type == "else_stat" then
+        return runElseStat(node, tEnv, shell)
     elseif node.type == "assignment" then
         return runAssignment(node, tEnv, shell)
     end
