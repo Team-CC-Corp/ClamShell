@@ -9,6 +9,7 @@ local tokenNameMap = {
     TK_STRING = "string",
     TK_IF = "if",
     TK_ELSE = "else",
+    TK_WHILE = "while",
     ["|"] = "|",
     [">"] = ">",
     [">>"] = ">>",
@@ -118,7 +119,7 @@ local function parser(lex, emit)
         else
             level = level + 1
         end
-        error(msg .. " near " .. lex.t.data, level)
+        error(msg .. " near " .. lex.t.data)
     end
 
     function parse.check(token)
@@ -194,6 +195,8 @@ local function parser(lex, emit)
             end
         elseif parse.test("TK_IF") then
             parse.ifStat()
+        elseif parse.test("TK_WHILE") then
+            parse.whileStat()
         end
     end
 
@@ -264,6 +267,16 @@ local function parser(lex, emit)
         end
 
         emit.finishElse()
+    end
+
+    function parse.whileStat()
+        parse.checkNext("TK_WHILE")
+        emit.beginWhile()
+        parse.command()
+        parse.checkNext("{")
+        parse.chunk()
+        parse.checkNext("}")
+        emit.finishWhile()
     end
 
     function parse.assignment()
@@ -367,6 +380,17 @@ local function emitter()
     function emit.finishElse()
         local elseStat = emit.popNode()
         emit.node.elseStat = elseStat
+    end
+
+    -- While control
+    function emit.beginWhile()
+        emit.pushNode()
+        emit.node.type = "while_stat"
+    end
+
+    function emit.finishWhile()
+        local whileStat = emit.popNode()
+        emit.node.statement = whileStat
     end
 
     -- Assignment

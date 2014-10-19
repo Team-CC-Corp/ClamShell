@@ -211,6 +211,12 @@ function runElseStat(node, tEnv, shell)
     end
 end
 
+function runWhileStat(node, tEnv, shell)
+    while runCommand(node.statement, tEnv, shell) do
+        runChunk(node.chunk, tEnv, shell)
+    end
+end
+
 function runChunk(node, tEnv, shell)
     for i,v in ipairs(node) do
         if not runNode(v.statement, tEnv, shell) then
@@ -241,6 +247,8 @@ function runNode(node, tEnv, shell)
         return runIfStat(node, tEnv, shell)
     elseif node.type == "else_stat" then
         return runElseStat(node, tEnv, shell)
+    elseif node.type == "while_stat" then
+        return runWhileStat(node, tEnv, shell)
     elseif node.type == "assignment" then
         return runAssignment(node, tEnv, shell)
     end
