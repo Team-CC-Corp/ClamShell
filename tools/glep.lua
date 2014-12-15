@@ -1,4 +1,4 @@
-local argparse = grin.getPackageAPI("ElvishJerricco/Grin", "argparse")
+local argparse = grin.getPackageAPI("Team-CC-Corp/Grin", "argparse")
 
 local parser = argparse.new()
 parser
