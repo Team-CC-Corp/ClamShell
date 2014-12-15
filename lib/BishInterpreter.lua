@@ -1,20 +1,3 @@
-do
-    local oldRead = read
-    function _G.read(rep, history)
-        local ret
-        parallel.waitForAny(function()
-            ret = oldRead(rep, history)
-        end, function()
-            local ctrlKeys = grin.getPackageAPI(__package, "ctrlKeys")
-            ctrlKeys.waitFor("d")
-            print()
-        end)
-        return ret
-    end
-end
-
-
-
 local function run(tEnv, shell, program, ...)
     if program:find("%.sh$") then
         local bish = grin.getPackageAPI(__package, "bish")

@@ -5,6 +5,8 @@ local parentTerm = term.current()
 local clamPkg = grin.packageFromExecutable(parentShell.getRunningProgram())
 local bish = grin.getPackageAPI(clamPkg, "bish")
 local BishInterpreter = grin.getPackageAPI(clamPkg, "BishInterpreter")
+local buffer = grin.getPackageAPI(clamPkg, "buffer")
+local readLine = grin.getPackageAPI(clamPkg, "readLine")
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
 local clamSettingsPath = ".clam.settings"
 
@@ -232,6 +234,14 @@ if #tArgs > 0 then
 
 else
     -- "shell"
+    -- Buffer
+    term.clear()
+    term.setCursorPos(1, 1)
+
+    local thisBuffer = buffer.new(parentTerm)
+    thisBuffer.bubble(true)
+    term.redirect(thisBuffer)
+
     -- Print the header
     term.setBackgroundColor( bgColor )
     term.setTextColor( promptColor )
@@ -259,13 +269,13 @@ else
 
     -- Read commands and execute them
     while not bExit do
-        term.redirect( parentTerm )
-        term.setBackgroundColor( bgColor )
-        term.setTextColor( promptColor )
+        term.redirect(thisBuffer)
+        term.setBackgroundColor(bgColor)
+        term.setTextColor(promptColor)
         write( shell.dir() .. "> " )
-        term.setTextColor( textColor )
+        term.setTextColor(textColor)
 
-        local sLine = read( nil, tCommandHistory )
+        local sLine = readLine.read( nil, tCommandHistory )
         if not sLine then
             return
         end
