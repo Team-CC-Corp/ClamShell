@@ -6,6 +6,7 @@ local clamPkg = grin.packageFromExecutable(parentShell.getRunningProgram())
 local bish = grin.getPackageAPI(clamPkg, "bish")
 local BishInterpreter = grin.getPackageAPI(clamPkg, "BishInterpreter")
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
+local clamSettingsPath = ".clam.settings"
 
 if multishell then
     multishell.setTitle( multishell.getCurrent(), "shell" )
@@ -38,6 +39,16 @@ else
     bgColor = colors.black
 end
 
+local tCommandHistory = {}
+local function writeSettings()
+    local settings = fs.open(clamSettingsPath, "w")
+    settings.write(textutils.serialize({
+        history = tCommandHistory,
+        dir = shell.dir(),
+    }))
+    settings.close()
+end
+
 -- Install shell API
 function shell.run( ... )
     local f, err = bish.compile(tEnv, shell, table.concat({...}, " "))
@@ -65,6 +76,7 @@ end
 
 function shell.setDir( _sDir )
     sDir = _sDir
+    writeSettings()
 end
 
 function shell.path()
@@ -231,8 +243,21 @@ else
         shell.run( "/rom/startup" )
     end
 
+    -- Load the settings file
+    local settingsFile = fs.open(clamSettingsPath, "r")
+    if settingsFile then
+        local content = settingsFile.readAll()
+        settingsFile.close()
+
+        local settings = textutils.unserialize(content)
+
+        if settings ~= nil then
+            if settings.history then tCommandHistory = settings.history end
+            if settings.dir then sDir = settings.dir end
+        end
+    end
+
     -- Read commands and execute them
-    local tCommandHistory = {}
     while not bExit do
         term.redirect( parentTerm )
         term.setBackgroundColor( bgColor )
@@ -244,7 +269,21 @@ else
         if not sLine then
             return
         end
-        table.insert( tCommandHistory, sLine )
+
+        if sLine:match("[^%s]") then -- If not blank
+            for i = #tCommandHistory, 1 do
+                if tCommandHistory[i] == sLine then
+                    table.remove(tCommandHistory, i)
+                end
+            end
+
+            while #tCommandHistory > 100 do -- Limit to 100 history items
+                table.remove(tCommandHistory, 1)
+            end
+            table.insert( tCommandHistory, sLine )
+            writeSettings()
+        end
+
         shell.run( sLine )
     end
 end
