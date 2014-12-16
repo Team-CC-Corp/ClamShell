@@ -281,7 +281,7 @@ else
         end
 
         if sLine:match("[^%s]") then -- If not blank
-            for i = #tCommandHistory, 1 do
+            for i = #tCommandHistory, 1, -1 do
                 if tCommandHistory[i] == sLine then
                     table.remove(tCommandHistory, i)
                 end
