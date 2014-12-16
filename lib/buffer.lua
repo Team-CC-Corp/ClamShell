@@ -18,6 +18,7 @@ function new(original)
 	local color = original.isColor()
 
 	local bubble = false
+	local friendlyClear = false
 	local original = original
 
 	local redirect = {}
@@ -43,6 +44,7 @@ function new(original)
 		else
 			writeText = writeText
 		end
+
 		local lineText = text[cursorYOffset]
 		local lineColor = textColor[cursorYOffset]
 		local lineBack = backColor[cursorYOffset]
@@ -60,7 +62,13 @@ function new(original)
 		if bubble then original.write(writeText) end
 	end
 	function redirect.clear()
-		for i=cursorYOffset, sizeY+cursorYOffset do
+		if friendlyClear then
+			lineOffset = lineOffset + sizeY
+			cursorYOffset = lineOffset + cursorYOffset
+			friendlyClear = false
+		end
+
+		for i=lineOffset + 1, sizeY+lineOffset do
 			text[i] = string.rep(" ", sizeX)
 			textColor[i] = string.rep(curTextColor, sizeX)
 			backColor[i] = string.rep(curBackColor, sizeX)
@@ -96,9 +104,9 @@ function new(original)
 	function redirect.scroll(n)
 		n = tonumber(n) or 1
 		if n > 0 then
-			lineOffset = lineOffset + 1
+			lineOffset = lineOffset + n
 			cursorYOffset = cursorY + lineOffset
-			for i = sizeY + cursorYOffset, sizeY - n + 1 + cursorYOffset, -1 do
+			for i = sizeY + lineOffset - n + 1, sizeY + lineOffset do
 				text[i] = string.rep(" ", sizeX)
 				textColor[i] = string.rep(curTextColor, sizeX)
 				backColor[i] = string.rep(curBackColor, sizeX)
@@ -162,39 +170,33 @@ function new(original)
 		end
 	end
 
-	function redirect.draw(current, offset)
+	function redirect.draw(offset)
+		local original = original
 		local lineOffset = lineOffset + (offset or 0)
 		for i=1, sizeY do
-			term.setCursorPos(1,i)
-			local offset = lineOffset + i
-			if (current and (text[offset] ~= current.text[offset] or textColor[offset] ~= current.textColor[offset] or backColor[offset] ~= current.backColor[offset])) or not current then
-				local lineEnd = false
-				local offset = 1
-				while not lineEnd do
-					local textColorString = string.match(string.sub(textColor[offset], offset), string.sub(textColor[offset], offset, offset).."*")
-					local backColorString = string.match(string.sub(backColor[offset], offset), string.sub(backColor[offset], offset, offset).."*")
-					term.setTextColor(2 ^ tonumber(string.sub(textColorString, 1, 1), 16))
-					term.setBackgroundColor(2 ^ tonumber(string.sub(backColorString, 1, 1), 16))
-					term.write(string.sub(text[offset], offset, offset + math.min(#textColorString, #backColorString) - 1))
-					offset = offset + math.min(#textColorString, #backColorString)
-					if offset > sizeX then lineEnd = true end
-				end
-				if current then
-					current.text[offset] = text[offset]
-					current.textColor[offset] = textColor[offset]
-					current.backColor[offset] = backColor[offset]
-				end
+			original.setCursorPos(1,i)
+			local yOffset = lineOffset + i
+			local lineEnd = false
+			local offset = 1
+			while not lineEnd do
+				local textColorString = string.match(string.sub(textColor[yOffset], offset), string.sub(textColor[yOffset], offset, offset).."*")
+				local backColorString = string.match(string.sub(backColor[yOffset], offset), string.sub(backColor[yOffset], offset, offset).."*")
+				original.setTextColor(2 ^ tonumber(string.sub(textColorString, 1, 1), 16))
+				original.setBackgroundColor(2 ^ tonumber(string.sub(backColorString, 1, 1), 16))
+				original.write(string.sub(text[yOffset], offset, offset + math.min(#textColorString, #backColorString) - 1))
+				offset = offset + math.min(#textColorString, #backColorString)
+				if offset > sizeX then lineEnd = true end
 			end
 		end
 
-		term.setCursorPos(cursorX, cursorY)
-		term.setTextColor(2 ^ tonumber(curTextColor, 16))
-		term.setBackgroundColor(2 ^ tonumber(curBackColor, 16))
-		term.setCursorBlink(cursorBlink)
-		return current
+		original.setCursorPos(cursorX, cursorY)
+		original.setTextColor(2 ^ tonumber(curTextColor, 16))
+		original.setBackgroundColor(2 ^ tonumber(curBackColor, 16))
+		original.setCursorBlink(cursorBlink)
 	end
 
 	function redirect.bubble(b) bubble = b end
+	function redirect.friendlyClear(b) friendlyClear = b end
 	function redirect.trim(max)
 		while lineOffset > max do
 			table.remove(text, 1)
@@ -204,6 +206,7 @@ function new(original)
 		end
 		cursorYOffset = cursorY + lineOffset
 	end
+	function redirect.totalHeight() return lineOffset end
 
 	redirect.clear()
 	return redirect

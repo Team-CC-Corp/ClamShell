@@ -270,12 +270,43 @@ else
     -- Read commands and execute them
     while not bExit do
         term.redirect(thisBuffer)
+        thisBuffer.friendlyClear(true)
+
         term.setBackgroundColor(bgColor)
         term.setTextColor(promptColor)
+
         write( shell.dir() .. "> " )
         term.setTextColor(textColor)
 
-        local sLine = readLine.read( nil, tCommandHistory )
+        local offset = 0
+        local sLine = nil
+        parallel.waitForAny(
+            function() sLine = readLine.read(nil, tCommandHistory) end,
+            function()
+                while true do
+                    local changed = false
+                    local e, change = os.pullEvent()
+                    if e == "mouse_scroll" then
+                        local newOffset = offset + change
+                        if newOffset > 0 then newOffset = 0 end
+                        if newOffset < -thisBuffer.totalHeight() then newOffset = -thisBuffer.totalHeight() end
+
+                        offset = newOffset
+                        changed = true
+                    elseif e == "key" or e == "paste" and offset ~= 0 then
+                        offset = 0
+                        changed = true
+                    end
+
+                    if changed then
+                        term.setCursorBlink(offset == 0)
+                        thisBuffer.draw(offset)
+                    end
+                end
+            end
+        )
+        if offset ~= 0 then buffer.draw() end
+
         if not sLine then
             return
         end
