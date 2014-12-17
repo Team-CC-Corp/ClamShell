@@ -28,11 +28,9 @@
     </target>
 
     <target name="if_unix" if="is_unix" depends="make_archive">
-        <exec executable="base64">
-            <arg value="-i" />
+        <exec executable="base64" output="build/clamshell.zip.base64" >
+            <arg value="--wrap=0" />
             <arg value="build/clamshell.zip" />
-            <arg value="-o" />
-            <arg value="build/clamshell.zip.base64" />
         </exec>
     </target>
 
