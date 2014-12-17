@@ -20,8 +20,19 @@ function new(original)
 	local bubble = false
 	local friendlyClear = false
 	local original = original
+	local maxScrollback = 100
 
 	local redirect = {}
+
+	local function trim()
+		while lineOffset > maxScrollback do
+			table.remove(text, 1)
+			table.remove(textColor, 1)
+			table.remove(backColor, 1)
+			lineOffset = lineOffset - 1
+		end
+		cursorYOffset = lineOffset + cursorY
+	end
 	function redirect.write(writeText)
 		writeText = tostring(writeText)
 		local pos = cursorX
@@ -64,8 +75,9 @@ function new(original)
 	function redirect.clear()
 		if friendlyClear then
 			lineOffset = lineOffset + sizeY
-			cursorYOffset = lineOffset + cursorYOffset
 			friendlyClear = false
+
+			trim()
 		end
 
 		for i=lineOffset + 1, sizeY+lineOffset do
@@ -105,12 +117,13 @@ function new(original)
 		n = tonumber(n) or 1
 		if n > 0 then
 			lineOffset = lineOffset + n
-			cursorYOffset = cursorY + lineOffset
 			for i = sizeY + lineOffset - n + 1, sizeY + lineOffset do
 				text[i] = string.rep(" ", sizeX)
 				textColor[i] = string.rep(curTextColor, sizeX)
 				backColor[i] = string.rep(curBackColor, sizeX)
 			end
+
+			trim()
 		elseif n < 0 then
 			for i = sizeY + cursorYOffset, math.abs(n) + 1 + cursorYOffset, -1 do
 				if text[i + n] then
@@ -207,6 +220,10 @@ function new(original)
 		cursorYOffset = cursorY + lineOffset
 	end
 	function redirect.totalHeight() return lineOffset end
+	function redirect.maxScrollback(n)
+		if n ~= nil then maxScrollback = n end
+		return maxScrollback
+	end
 
 	redirect.clear()
 	return redirect
