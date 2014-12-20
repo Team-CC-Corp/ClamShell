@@ -5,7 +5,10 @@ local parentTerm = term.current()
 local clamPkg = grin.packageFromExecutable(parentShell.getRunningProgram())
 local bish = grin.getPackageAPI(clamPkg, "bish")
 local BishInterpreter = grin.getPackageAPI(clamPkg, "BishInterpreter")
+local buffer = grin.getPackageAPI(clamPkg, "buffer")
+local readLine = grin.getPackageAPI(clamPkg, "readLine")
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
+local clamSettingsPath = ".clam.settings"
 
 if multishell then
     multishell.setTitle( multishell.getCurrent(), "shell" )
@@ -13,7 +16,7 @@ end
 
 local bExit = false
 local sDir = (parentShell and parentShell.dir()) or ""
-local sPath = ".:" .. grin.getFromPackage(clamPkg, "tools") .. ":"
+local sPath = ".:/" .. grin.getFromPackage(clamPkg, "tools") .. ":"
     .. ((parentShell and parentShell.path()) or "/rom/programs")
 local tAliases = (parentShell and parentShell.aliases()) or {}
 tAliases.sh = "clam"
@@ -36,6 +39,16 @@ else
     promptColor = colors.white
     textColor = colors.white
     bgColor = colors.black
+end
+
+local tCommandHistory = {}
+local function writeSettings()
+    local settings = fs.open(clamSettingsPath, "w")
+    settings.write(textutils.serialize({
+        history = tCommandHistory,
+        dir = shell.dir(),
+    }))
+    settings.close()
 end
 
 -- Install shell API
@@ -65,6 +78,7 @@ end
 
 function shell.setDir( _sDir )
     sDir = _sDir
+    writeSettings()
 end
 
 function shell.path()
@@ -220,6 +234,14 @@ if #tArgs > 0 then
 
 else
     -- "shell"
+    -- Buffer
+    term.clear()
+    term.setCursorPos(1, 1)
+
+    local thisBuffer = buffer.new(parentTerm)
+    thisBuffer.bubble(true)
+    term.redirect(thisBuffer)
+
     -- Print the header
     term.setBackgroundColor( bgColor )
     term.setTextColor( promptColor )
@@ -231,20 +253,78 @@ else
         shell.run( "/rom/startup" )
     end
 
-    -- Read commands and execute them
-    local tCommandHistory = {}
-    while not bExit do
-        term.redirect( parentTerm )
-        term.setBackgroundColor( bgColor )
-        term.setTextColor( promptColor )
-        write( shell.dir() .. "> " )
-        term.setTextColor( textColor )
+    -- Load the settings file
+    local settingsFile = fs.open(clamSettingsPath, "r")
+    if settingsFile then
+        local content = settingsFile.readAll()
+        settingsFile.close()
 
-        local sLine = read( nil, tCommandHistory )
+        local settings = textutils.unserialize(content)
+
+        if settings ~= nil then
+            if settings.history then tCommandHistory = settings.history end
+            if settings.dir then sDir = settings.dir end
+        end
+    end
+
+    -- Read commands and execute them
+    while not bExit do
+        term.redirect(thisBuffer)
+        thisBuffer.friendlyClear(true)
+
+        term.setBackgroundColor(bgColor)
+        term.setTextColor(promptColor)
+
+        write( shell.dir() .. "> " )
+        term.setTextColor(textColor)
+
+        local offset = 0
+        local sLine = nil
+        parallel.waitForAny(
+            function() sLine = readLine.read(nil, tCommandHistory) end,
+            function()
+                while true do
+                    local changed = false
+                    local e, change = os.pullEvent()
+                    if e == "mouse_scroll" then
+                        local newOffset = offset + change
+                        if newOffset > 0 then newOffset = 0 end
+                        if newOffset < -thisBuffer.totalHeight() then newOffset = -thisBuffer.totalHeight() end
+
+                        offset = newOffset
+                        changed = true
+                    elseif e == "key" or e == "paste" and offset ~= 0 then
+                        offset = 0
+                        changed = true
+                    end
+
+                    if changed then
+                        term.setCursorBlink(offset == 0)
+                        thisBuffer.draw(offset)
+                    end
+                end
+            end
+        )
+        if offset ~= 0 then buffer.draw() end
+
         if not sLine then
             return
         end
-        table.insert( tCommandHistory, sLine )
+
+        if sLine:match("[^%s]") then -- If not blank
+            for i = #tCommandHistory, 1, -1 do
+                if tCommandHistory[i] == sLine then
+                    table.remove(tCommandHistory, i)
+                end
+            end
+
+            while #tCommandHistory > 100 do -- Limit to 100 history items
+                table.remove(tCommandHistory, 1)
+            end
+            table.insert( tCommandHistory, sLine )
+            writeSettings()
+        end
+
         shell.run( sLine )
     end
 end
