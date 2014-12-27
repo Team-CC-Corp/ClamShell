@@ -30,7 +30,7 @@ for i,dir in ipairs(options.dirs) do
         end
 
         local tDirs, tFiles = {}, {}
-        for i,entry in ipairs(fs.list(shell.resolve(dir))) do
+        for i,entry in ipairs(fs.list(dir)) do
             if entry:sub(1,1) ~= "." or options.a then
                 if fs.isDir(fs.combine(dir, entry)) then
                     table.insert(tDirs, entry)
@@ -52,7 +52,7 @@ for i,dir in ipairs(options.dirs) do
         end
     else
         local tDir = {}
-        for i,entry in ipairs(fs.list(shell.resolve(dir))) do
+        for i,entry in ipairs(fs.list(dir)) do
             if entry:sub(1,1) ~= "." or options.a then
                 table.insert(tDir, entry)
             end
