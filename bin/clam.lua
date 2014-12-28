@@ -8,19 +8,25 @@ local BishInterpreter = grin.getPackageAPI(clamPkg, "BishInterpreter")
 local buffer = grin.getPackageAPI(clamPkg, "buffer")
 local readLine = grin.getPackageAPI(clamPkg, "readLine")
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
-local clamSettingsPath = ".clam.settings"
 
 if multishell then
     multishell.setTitle( multishell.getCurrent(), "shell" )
 end
 
 local bExit = false
-local sDir = (parentShell and parentShell.dir()) or ""
 local sPath = ".:/" .. grin.getFromPackage(clamPkg, "tools") .. ":"
     .. ((parentShell and parentShell.path()) or "/rom/programs")
 local tAliases = (parentShell and parentShell.aliases()) or {}
 tAliases.sh = "clam"
 tAliases.shell = "clam"
+
+local environmentVariables
+if parentShell and parentShell.getEnvironmentVariables then
+    environmentVariables = parentShell.getEnvironmentVariables()
+else
+    environmentVariables = {}
+end
+
 local tProgramStack = {}
 
 local shell = {}
@@ -29,26 +35,108 @@ local tEnv = {
     [ "multishell" ] = multishell,
 }
 
--- Colors
-local promptColor, textColor, bgColor
-if term.isColor() then
-    promptColor = colors.lightBlue
-    textColor = colors.white
-    bgColor = colors.black
-else
-    promptColor = colors.white
-    textColor = colors.white
-    bgColor = colors.black
+-- Settings handling
+local clamSettingsPath = ".clam.settings"
+local clamHistoryPath = ".clam.history"
+
+local function writeSettings(path, table)
+    if not table then return end
+
+    local success, serialize = pcall(textutils.serialize, table)
+    if not success then return end
+
+    local file = fs.open(path, "w")
+    if not file then return end
+    file.write(serialize)
+    file.close()
 end
 
-local tCommandHistory = {}
-local function writeSettings()
-    local settings = fs.open(clamSettingsPath, "w")
-    settings.write(textutils.serialize({
-        history = tCommandHistory,
-        dir = shell.dir(),
-    }))
-    settings.close()
+local function readSettings(path)
+    local file = fs.open(path, "r")
+    if not file then return end
+    local contents = file.readAll()
+    file.close()
+
+    local result = textutils.unserialize(contents)
+    if not result or type(result) ~= "table" then return end
+
+    return result
+end
+
+local function updateProperty(path, table, key, value)
+    local old = readSettings(path) or {}
+    for k, v in pairs(old) do
+        if k ~= key then table[k] = v end
+    end
+    table[key] = value
+
+    writeSettings(path, table)
+end
+
+-- Load settings
+local termColors, settings, tCommandHistory
+do
+    local defaults = {
+        dir = (parentShell and parentShell.dir()) or "",
+
+        colors = {
+            prompt = colors.white,
+            text = colors.white,
+            bg = colors.black,
+        },
+
+        aliases = {},
+        env = {},
+
+        maxScrollback = 100,
+        maxHistory = 100,
+    }
+
+    if term.isColor() then
+        defaults.colors.prompt = colors.lightBlue
+    end
+
+    settings = setmetatable(readSettings(clamSettingsPath) or {}, {__index = defaults})
+    tCommandHistory = readSettings(clamHistoryPath) or {}
+
+    -- Colors
+    termColors = setmetatable({}, {__index = defaults.colors})
+    local validColors = {}
+    for i=0,16,1 do validColors[2^i] = true end
+    local validator = term.isColor() and
+        function(c) return validColors[c] end or
+        function(c) return color == colors.black or color == colors.white end
+
+    local defaultCols = defaults.colors
+    for name, color in pairs(settings.colors) do
+        if type(color) == "string" then
+            color = colors[color] or colours[color]
+        end
+        if not color or not validator(color) then
+            color = defaultCols[name]
+        end
+        termColors[name] = color
+    end
+
+    -- Aliases
+    local aliases = settings.aliases
+    if type(aliases) == "table" then
+        for name, value in pairs(aliases) do
+            if type(name) == "string" and type(value) == "string" then
+                tAliases[name] = value
+            end
+        end
+    end
+
+    -- Environment
+    local variables = settings.env
+    if type(variables) == "table" then
+        for name, value in pairs(variables) do
+            if type(name) == "string" and type(value) == "string" then
+                environmentVariables[name] = value
+            end
+        end
+    end
 end
 
 -- Install shell API
@@ -73,12 +161,11 @@ function shell.exit()
 end
 
 function shell.dir()
-    return sDir
+    return settings.dir
 end
 
 function shell.setDir( _sDir )
-    sDir = _sDir
-    writeSettings()
+    updateProperty(clamSettingsPath, settings, "dir", _sDir)
 end
 
 function shell.path()
@@ -94,7 +181,7 @@ function shell.resolve( _sPath )
     if sStartChar == "/" or sStartChar == "\\" then
         return fs.combine( "", _sPath )
     else
-        return fs.combine( sDir, _sPath )
+        return fs.combine( settings.dir, _sPath )
     end
 end
 
@@ -115,7 +202,7 @@ function shell.resolveProgram( _sCommand )
         end
         return nil
     end
-    
+
     -- Otherwise, look on the path variable
     for sPath in string.gmatch(sPath, "[^:]+") do
         sPath = fs.combine( shell.resolve( sPath ), _sCommand )
@@ -125,14 +212,14 @@ function shell.resolveProgram( _sCommand )
             return sPath
         end
     end
-    
+
     -- Not found
     return nil
 end
 
 function shell.programs( _bIncludeHidden )
     local tItems = {}
-    
+
     -- Add programs from the path
     for sPath in string.gmatch(sPath, "[^:]+") do
         sPath = shell.resolve( sPath )
@@ -145,7 +232,7 @@ function shell.programs( _bIncludeHidden )
                 end
             end
         end
-    end 
+    end
 
     -- Sort and return
     local tItemList = {}
@@ -191,12 +278,6 @@ function shell.version()
     return "ClamShell 1.0"
 end
 
-local environmentVariables
-if parentShell and parentShell.getEnvironmentVariables then
-    environmentVariables = parentShell.getEnvironmentVariables()
-else
-    environmentVariables = {}
-end
 function shell.getEnvironmentVariables()
     local copy = {}
     for k,v in pairs(environmentVariables) do
@@ -238,33 +319,19 @@ else
     term.clear()
     term.setCursorPos(1, 1)
 
-    local thisBuffer = buffer.new(parentTerm)
+    local thisBuffer = buffer.new(parentTerm, settings)
     thisBuffer.bubble(true)
     term.redirect(thisBuffer)
 
     -- Print the header
-    term.setBackgroundColor( bgColor )
-    term.setTextColor( promptColor )
+    term.setBackgroundColor(termColors.bg)
+    term.setTextColor(termColors.prompt)
     print(os.version(), " - ", shell.version())
-    term.setTextColor( textColor )
+    term.setTextColor(termColors.text)
 
     -- Run the startup program
     if parentShell == nil then
         shell.run( "/rom/startup" )
-    end
-
-    -- Load the settings file
-    local settingsFile = fs.open(clamSettingsPath, "r")
-    if settingsFile then
-        local content = settingsFile.readAll()
-        settingsFile.close()
-
-        local settings = textutils.unserialize(content)
-
-        if settings ~= nil then
-            if settings.history then tCommandHistory = settings.history end
-            if settings.dir then sDir = settings.dir end
-        end
     end
 
     -- Read commands and execute them
@@ -272,11 +339,11 @@ else
         term.redirect(thisBuffer)
         thisBuffer.friendlyClear(true)
 
-        term.setBackgroundColor(bgColor)
-        term.setTextColor(promptColor)
+        term.setBackgroundColor(termColors.bg)
+        term.setTextColor(termColors.prompt)
 
         write( shell.dir() .. "> " )
-        term.setTextColor(textColor)
+        term.setTextColor(termColors.text)
 
         local offset = 0
         local sLine = nil
@@ -318,11 +385,11 @@ else
                 end
             end
 
-            while #tCommandHistory > 100 do -- Limit to 100 history items
+            while #tCommandHistory > (settings.maxHistory or 100) do -- Limit to n number of history items
                 table.remove(tCommandHistory, 1)
             end
             table.insert( tCommandHistory, sLine )
-            writeSettings()
+            writeSettings(clamHistoryPath, tCommandHistory)
         end
 
         shell.run( sLine )
