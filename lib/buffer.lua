@@ -1,4 +1,4 @@
-function new(original)
+function new(original, settings)
 	if not original then original = term.current() end
 	local text = {}
 	local textColor = {}
@@ -20,7 +20,7 @@ function new(original)
 	local bubble = false
 	local friendlyClear = false
 	local original = original
-	local maxScrollback = 100
+	local maxScrollback = settings and settings.maxScrollback or 100
 
 	local redirect = {}
 
