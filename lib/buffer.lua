@@ -1,4 +1,4 @@
-function new(original, settings)
+function new(original)
 	if not original then original = term.current() end
 	local text = {}
 	local textColor = {}
@@ -20,16 +20,18 @@ function new(original, settings)
 	local bubble = false
 	local friendlyClear = false
 	local original = original
-	local maxScrollback = settings and settings.maxScrollback or 100
+	local maxScrollback = 100
 
 	local redirect = {}
 
 	local function trim()
-		while lineOffset > maxScrollback do
-			table.remove(text, 1)
-			table.remove(textColor, 1)
-			table.remove(backColor, 1)
-			lineOffset = lineOffset - 1
+		if maxScrollback > -1 then
+			while lineOffset > maxScrollback do
+				table.remove(text, 1)
+				table.remove(textColor, 1)
+				table.remove(backColor, 1)
+				lineOffset = lineOffset - 1
+			end
 		end
 		cursorYOffset = lineOffset + cursorY
 	end

@@ -37,7 +37,7 @@ local tEnv = {
 
 -- Settings handling
 local clamSettingsPath = ".clam.settings"
-local clamHistoryPath = ".clam.history"
+local clamSessionPath = ".clam.session"
 
 local function writeSettings(path, table)
     if not table then return end
@@ -63,22 +63,10 @@ local function readSettings(path)
     return result
 end
 
-local function updateProperty(path, table, key, value)
-    local old = readSettings(path) or {}
-    for k, v in pairs(old) do
-        if k ~= key then table[k] = v end
-    end
-    table[key] = value
-
-    writeSettings(path, table)
-end
-
 -- Load settings
-local termColors, settings, tCommandHistory
+local termColors, settings, session
 do
     local defaults = {
-        dir = (parentShell and parentShell.dir()) or "",
-
         colors = {
             prompt = colors.white,
             text = colors.white,
@@ -97,7 +85,16 @@ do
     end
 
     settings = setmetatable(readSettings(clamSettingsPath) or {}, {__index = defaults})
-    tCommandHistory = readSettings(clamHistoryPath) or {}
+    session = readSettings(clamSessionPath) or {}
+
+    -- Set session vars
+    if type(session.dir) ~= "string" then
+        session.dir = (parentShell and parentShell.dir and parentShell.dir()) or ""
+    end
+
+    if type(session.history) ~= "table" then
+        session.history = {}
+    end
 
     -- Colors
     termColors = setmetatable({}, {__index = defaults.colors})
@@ -137,6 +134,10 @@ do
             end
         end
     end
+
+    -- Other settings
+    session.maxHistory = tonumber(session.maxHistory)
+    session.maxScrollback = tonumber(session.maxScrollback)
 end
 
 -- Install shell API
@@ -161,11 +162,12 @@ function shell.exit()
 end
 
 function shell.dir()
-    return settings.dir
+    return session.dir
 end
 
 function shell.setDir( _sDir )
-    updateProperty(clamSettingsPath, settings, "dir", _sDir)
+    session.dir = _sDir
+    writeSettings(clamSessionPath, session)
 end
 
 function shell.path()
@@ -181,7 +183,7 @@ function shell.resolve( _sPath )
     if sStartChar == "/" or sStartChar == "\\" then
         return fs.combine( "", _sPath )
     else
-        return fs.combine( settings.dir, _sPath )
+        return fs.combine( session.dir, _sPath )
     end
 end
 
@@ -319,8 +321,9 @@ else
     term.clear()
     term.setCursorPos(1, 1)
 
-    local thisBuffer = buffer.new(parentTerm, settings)
+    local thisBuffer = buffer.new(parentTerm)
     thisBuffer.bubble(true)
+    thisBuffer.maxScrollback(settings.maxScrollback)
     term.redirect(thisBuffer)
 
     -- Print the header
@@ -333,6 +336,9 @@ else
     if parentShell == nil then
         shell.run( "/rom/startup" )
     end
+
+    local tCommandHistory = session.history
+    local maxHistory = settings.maxHistory
 
     -- Read commands and execute them
     while not bExit do
@@ -385,11 +391,13 @@ else
                 end
             end
 
-            while #tCommandHistory > (settings.maxHistory or 100) do -- Limit to n number of history items
-                table.remove(tCommandHistory, 1)
+            if maxHistory > -1 then
+                while #tCommandHistory > maxHistory do -- Limit to n number of history items
+                    table.remove(tCommandHistory, 1)
+                end
             end
             table.insert( tCommandHistory, sLine )
-            writeSettings(clamHistoryPath, tCommandHistory)
+            writeSettings(clamSessionPath, session)
         end
 
         shell.run( sLine )
