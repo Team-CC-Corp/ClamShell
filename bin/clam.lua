@@ -75,6 +75,8 @@ do
         aliases = {},
         env = {},
 
+        pageScroll = 15,
+
         maxScrollback = 100,
         maxHistory = 100,
     }
@@ -356,28 +358,31 @@ else
             function() sLine = readLine.read(nil, tCommandHistory) end,
             function()
                 while true do
-                    local changed = false
-                    local e, change = os.pullEvent()
+                    local change = 0
+                    local e, eventArg = os.pullEvent()
                     if e == "mouse_scroll" then
-                        local newOffset = offset + change
-                        if newOffset > 0 then newOffset = 0 end
-                        if newOffset < -thisBuffer.totalHeight() then newOffset = -thisBuffer.totalHeight() end
-
-                        offset = newOffset
-                        changed = true
-                    elseif e == "key" or e == "paste" and offset ~= 0 then
-                        offset = 0
-                        changed = true
+                        change = eventArg
+                    elseif e == "key" and eventArg == keys.pageDown then
+                        change = settings.pageScroll
+                    elseif e == "key" and eventArg == keys.pageUp then
+                        change = -settings.pageScroll
+                    elseif e == "key" or e == "paste" then
+                        -- Reset offset if another key is pressed
+                        change = -offset
                     end
 
-                    if changed then
+                    if change ~= 0 then
+                        offset = offset + change
+                        if offset > 0 then offset = 0 end
+                        if offset < -thisBuffer.totalHeight() then offset = -thisBuffer.totalHeight() end
+
                         term.setCursorBlink(offset == 0)
                         thisBuffer.draw(offset)
                     end
                 end
             end
         )
-        if offset ~= 0 then buffer.draw() end
+        if offset ~= 0 then thisBuffer.draw() end
 
         if not sLine then
             return
