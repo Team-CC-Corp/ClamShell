@@ -1,4 +1,3 @@
-
 local multishell = multishell
 local parentShell = shell
 local parentTerm = term.current()

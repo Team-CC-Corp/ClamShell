@@ -159,7 +159,7 @@ local function parser(lex, emit)
         lex.next()
         parse.chunk()
     end
-    
+
     function parse.chunk()
         emit.beginChunk()
 
