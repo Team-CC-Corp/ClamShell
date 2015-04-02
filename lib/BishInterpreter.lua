@@ -102,6 +102,19 @@ function runCommand(node, tEnv, shell)
             end
 
             stdout = grin.assert(fs.open(fname, writeType), "File could not be opened: " .. fname, 0)
+
+            -- Overwrite the writeLine function for multiple arguments
+            local oldWriteLine = stdout.writeLine
+            function stdout.writeLine(...)
+                for _, val in ipairs({...}) do
+                    stdout.write(tostring(val))
+                end
+
+                -- Use oldWriteLine("") instead of stdout.write("\n") because
+                -- writeLine uses the line.separator property
+                oldWriteLine("")
+            end
+
             stdout.isPiped = true
             curNode = nil
         else
