@@ -412,17 +412,23 @@ local function emitter()
     return emit
 end
 
+function parse(sProgram)
+    local lex = lexer(sProgram)
+    local emit = emitter()
+    local parse = parser(lex, emit)
+
+    parse.parse()
+
+    return emit.node
+end
+
 function compile(tEnv, shell, sProgram)
     local ok, f = pcall(function()
-        local lex = lexer(sProgram)
-        local emit = emitter()
-        local parse = parser(lex, emit)
-
-        parse.parse()
+        local node = parse(sProgram)
 
         return pfunc(function()
             local bi = grin.getPackageAPI(__package, "BishInterpreter")
-            return bi.runNode(emit.node, tEnv, shell)
+            return bi.runNode(node, tEnv, shell)
         end)
     end)
     if not ok then

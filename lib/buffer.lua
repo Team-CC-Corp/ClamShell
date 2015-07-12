@@ -176,6 +176,11 @@ function new(original)
     function redirect.isColor() return color == true end
     redirect.isColour = redirect.isColor
 
+    function redirect.getTextColor() return 2 ^ tonumber(curTextColor, 16) end
+    function redirect.getBackgroundColor() return 2 ^ tonumber(curBackColor, 16) end
+    redirect.getTextColour = redirect.getTextColor
+    redirect.getBackgroundColour = redirect.getBackgroundColor
+
     function redirect.render(inputBuffer)
         local offset = lineOffset
         for i = 1, sizeY do

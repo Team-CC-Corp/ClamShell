@@ -19,13 +19,8 @@ local tAliases = (parentShell and parentShell.aliases()) or {}
 tAliases.sh = "clam"
 tAliases.shell = "clam"
 
-local environmentVariables
-if parentShell and parentShell.getEnvironmentVariables then
-    environmentVariables = parentShell.getEnvironmentVariables()
-else
-    environmentVariables = {}
-end
-
+local environmentVariables = (parentShell and parentShell.getEnvironmentVariables) and parentShell.getEnvironmentVariables() or {}
+local tCompletionInfo = (parentShell and parentShell.getCompletionInfo()) or {}
 local tProgramStack = {}
 
 local shell = {}
@@ -246,6 +241,123 @@ function shell.programs( _bIncludeHidden )
     return tItemList
 end
 
+local function completeProgram( sLine )
+    if #sLine > 0 and string.sub( sLine, 1, 1 ) == "/" then
+        -- Add programs from the root
+        return fs.complete( sLine, "", true, false )
+    else
+        local tResults = {}
+        local tSeen = {}
+
+        -- Add aliases
+        for sAlias, sCommand in pairs( tAliases ) do
+            if #sAlias > #sLine and string.sub( sAlias, 1, #sLine ) == sLine then
+                local sResult = string.sub( sAlias, #sLine + 1 )
+                if not tSeen[ sResult ] then
+                    table.insert( tResults, sResult )
+                    tSeen[ sResult ] = true
+                end
+            end
+        end
+
+        -- Add programs from the path
+        local tPrograms = shell.programs()
+        for n=1,#tPrograms do
+            local sProgram = tPrograms[n]
+            if #sProgram > #sLine and string.sub( sProgram, 1, #sLine ) == sLine then
+                local sResult = string.sub( sProgram, #sLine + 1 )
+                if not tSeen[ sResult ] then
+                    table.insert( tResults, sResult )
+                    tSeen[ sResult ] = true
+                end
+            end
+        end
+
+        -- Sort and return
+        table.sort( tResults )
+        return tResults
+    end
+end
+
+local function completeProgramArgument( sProgram, nArgument, sPart, tPreviousParts )
+    local tInfo = tCompletionInfo[ sProgram ]
+    if tInfo then
+        return tInfo.fnComplete( shell, nArgument, sPart, tPreviousParts )
+    end
+    return nil
+end
+
+local function findCommand(node)
+    local type = node.type
+
+    if type == "command" then
+        return node.command
+    elseif type == "array_element" then
+        return findCommand(node.statement)
+    elseif type == "chunk" then
+        if #node == 0 then return nil end
+        return findCommand(node[#node])
+    elseif type == "root" then
+        return findCommand(node.chunk)
+    end
+
+end
+
+function shell.complete( sLine )
+    if #sLine > 0 then
+        local success, root = pcall(bish.parse, sLine)
+        if not success then return nil end
+
+        local tWords = findCommand(root)
+        if not tWords then return nil end
+
+        local nIndex = #tWords
+        if string.sub( sLine, #sLine, #sLine ) == " " then
+            nIndex = nIndex + 1
+        end
+        if nIndex == 1 then
+            local sBit = tWords[1] or ""
+            local sPath = shell.resolveProgram( sBit )
+            if tCompletionInfo[ sPath ] then
+                return { " " }
+            else
+                local tResults = completeProgram( sBit )
+                for n=1,#tResults do
+                    local sResult = tResults[n]
+                    local sPath = shell.resolveProgram( sBit .. sResult )
+                    if tCompletionInfo[ sPath ] then
+                        tResults[n] = sResult .. " "
+                    end
+                end
+                return tResults
+            end
+
+        elseif nIndex > 1 then
+            local sPath = shell.resolveProgram( tWords[1] )
+            local sPart = tWords[nIndex] or ""
+            local tPreviousParts = tWords
+            tPreviousParts[nIndex] = nil
+            return completeProgramArgument( sPath , nIndex - 1, sPart, tPreviousParts )
+
+        end
+    end
+	return nil
+end
+
+function shell.completeProgram( sProgram )
+    return completeProgram( sProgram )
+end
+
+function shell.setCompletionFunction( sProgram, fnComplete )
+    tCompletionInfo[ sProgram ] = {
+        fnComplete = fnComplete
+    }
+end
+
+function shell.getCompletionInfo()
+    return tCompletionInfo
+end
+
 function shell.pushRunningProgram(prg)
     table.insert(tProgramStack, prg)
 end
@@ -355,7 +467,7 @@ else
         local offset = 0
         local sLine = nil
         parallel.waitForAny(
-            function() sLine = readLine.read(nil, tCommandHistory) end,
+            function() sLine = readLine.read(nil, tCommandHistory, shell.complete) end,
             function()
                 while true do
                     local change = 0
