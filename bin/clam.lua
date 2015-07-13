@@ -9,7 +9,7 @@ local readLine = grin.getPackageAPI(clamPkg, "readLine")
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
 
 if multishell then
-    multishell.setTitle( multishell.getCurrent(), "shell" )
+    multishell.setTitle(multishell.getCurrent(), "shell")
 end
 
 local bExit = false
@@ -422,6 +422,8 @@ if multishell then
     end
 end
 
+grin.getPackageAPI(clamPkg, "autocomplete").setup(grin.getFromPackage(clamPkg, "tools"), shell)
+
 local tArgs = { ... }
 if #tArgs > 0 then
     -- "shell x y z"
@@ -512,7 +514,7 @@ else
                     table.remove(tCommandHistory, 1)
                 end
             end
-            table.insert( tCommandHistory, sLine )
+            table.insert(tCommandHistory, sLine)
             writeSettings(clamSessionPath, session)
         end
 
