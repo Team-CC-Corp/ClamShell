@@ -74,6 +74,46 @@ function new(original)
 
         if bubble then original.write(writeText) end
     end
+
+    function redirect.blit(writeText, writeFore, writeBack)
+        local pos = cursorX
+        if cursorY > sizeY or cursorY < 1 then
+            cursorX = pos + #writeText
+            return
+        end
+        if pos + #writeText <= 1 then
+            --skip entirely.
+            cursorX = pos + #writeText
+            return
+        elseif pos < 1 then
+            --adjust text to fit on screen starting at one.
+            writeText = string.sub(writeText, math.abs(cursorX) + 2)
+            cursorX = 1
+        elseif pos > sizeX then
+            --if we're off the edge to the right, skip entirely.
+            cursorX = pos + #writeText
+            return
+        else
+            writeText = writeText
+        end
+
+        local lineText = text[cursorYOffset]
+        local lineColor = textColor[cursorYOffset]
+        local lineBack = backColor[cursorYOffset]
+        local preStop = cursorX - 1
+        local preStart = math.min(1, preStop)
+        local postStart = cursorX + string.len(writeText)
+        local postStop = sizeX
+        local sub, rep = string.sub, string.rep
+
+        text[cursorYOffset] = sub(lineText, preStart, preStop)..writeText..sub(lineText, postStart, postStop)
+        textColor[cursorYOffset] = sub(lineColor, preStart, preStop)..writeFore..sub(lineColor, postStart, postStop)
+        backColor[cursorYOffset] = sub(lineBack, preStart, preStop)..writeBack..sub(lineBack, postStart, postStop)
+        cursorX = pos + string.len(writeText)
+
+        if bubble then original.blit(writeText, writeFore, writeBack) end
+    end
+
     function redirect.clear()
         if friendlyClear then
             lineOffset = lineOffset + sizeY
@@ -97,9 +137,11 @@ function new(original)
 
         if bubble then original.clearLine() end
     end
+
     function redirect.getCursorPos()
         return cursorX, cursorY
     end
+
     function redirect.setCursorPos(x, y)
         cursorX = math.floor(tonumber(x)) or cursorX
         cursorY = math.floor(tonumber(y)) or cursorY
@@ -108,13 +150,16 @@ function new(original)
 
         if bubble then original.setCursorPos(x, y) end
     end
+
     function redirect.setCursorBlink(b)
         cursorBlink = b
         if bubble then original.setCursorBlink(b) end
     end
+
     function redirect.getSize()
         return sizeX, sizeY
     end
+
     function redirect.scroll(n)
         n = tonumber(n) or 1
         if n > 0 then
@@ -144,6 +189,7 @@ function new(original)
 
         if bubble then original.scroll(n) end
     end
+
     function redirect.setTextColor(clr)
         if clr and clr <= 32768 and clr >= 1 then
             if color then
@@ -182,7 +228,6 @@ function new(original)
     redirect.getBackgroundColour = redirect.getBackgroundColor
 
     function redirect.render(inputBuffer)
-        local offset = lineOffset
         for i = 1, sizeY do
             text[i + lineOffset] = inputBuffer.text[i]
             textColor[i + lineOffset] = inputBuffer.textColor[i]
@@ -196,17 +241,7 @@ function new(original)
         for i=1, sizeY do
             original.setCursorPos(1,i)
             local yOffset = lineOffset + i
-            local lineEnd = false
-            local offset = 1
-            while not lineEnd do
-                local textColorString = string.match(string.sub(textColor[yOffset], offset), string.sub(textColor[yOffset], offset, offset).."*")
-                local backColorString = string.match(string.sub(backColor[yOffset], offset), string.sub(backColor[yOffset], offset, offset).."*")
-                original.setTextColor(2 ^ tonumber(string.sub(textColorString, 1, 1), 16))
-                original.setBackgroundColor(2 ^ tonumber(string.sub(backColorString, 1, 1), 16))
-                original.write(string.sub(text[yOffset], offset, offset + math.min(#textColorString, #backColorString) - 1))
-                offset = offset + math.min(#textColorString, #backColorString)
-                if offset > sizeX then lineEnd = true end
-            end
+            original.blit(text[yOffset], textColor[yOffset], backColor[yOffset])
         end
 
         original.setCursorPos(cursorX, cursorY)
@@ -217,6 +252,7 @@ function new(original)
 
     function redirect.bubble(b) bubble = b end
     function redirect.friendlyClear(b) friendlyClear = b end
+
     function redirect.trim(max)
         while lineOffset > max do
             table.remove(text, 1)
@@ -227,6 +263,7 @@ function new(original)
         cursorYOffset = cursorY + lineOffset
     end
     function redirect.totalHeight() return lineOffset end
+
     function redirect.maxScrollback(n)
         if n ~= nil then maxScrollback = n end
         return maxScrollback
