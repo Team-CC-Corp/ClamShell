@@ -269,6 +269,11 @@ function new(original)
         return maxScrollback
     end
 
+    function redirect.updateSize()
+        local _, y = original.getSize()
+        sizeY = y
+    end
+
     redirect.clear()
     return redirect
 end

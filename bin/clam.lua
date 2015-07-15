@@ -484,6 +484,9 @@ else
                     elseif e == "key" or e == "paste" then
                         -- Reset offset if another key is pressed
                         change = -offset
+                    elseif e == "term_resize" then
+                        thisBuffer.updateSize()
+                        thisBuffer.draw(offset)
                     end
 
                     if change ~= 0 then
@@ -519,6 +522,12 @@ else
             writeSettings(clamSessionPath, session)
         end
 
-        shell.run( sLine )
+        parallel.waitForAny(function () shell.run( sLine ) end, function()
+            while true do
+                os.pullEvent("term_resize")
+                thisBuffer.updateSize()
+                thisBuffer.draw(offset)
+            end
+        end)
     end
 end
