@@ -19,6 +19,7 @@ local function run(tEnv, shell, program, ...)
 end
 
 function runCommand(node, tEnv, shell)
+    local read = tEnv.read or read
     local cmds = {}
 
     local stdin = {readLine=read,close=function()end}

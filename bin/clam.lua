@@ -5,7 +5,7 @@ local clamPkg = grin.packageFromExecutable(parentShell.getRunningProgram())
 local bish = grin.getPackageAPI(clamPkg, "bish")
 local BishInterpreter = grin.getPackageAPI(clamPkg, "BishInterpreter")
 local buffer = grin.getPackageAPI(clamPkg, "buffer")
-local readLine = grin.getPackageAPI(clamPkg, "readLine")
+local read = grin.getPackageAPI(clamPkg, "readLine").read
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
 
 if multishell then
@@ -27,6 +27,7 @@ local shell = {}
 local tEnv = {
     [ "shell" ] = shell,
     [ "multishell" ] = multishell,
+    [ "read" ] = read
 }
 
 -- Settings handling
@@ -469,7 +470,7 @@ else
         local offset = 0
         local sLine = nil
         parallel.waitForAny(
-            function() sLine = readLine.read(nil, tCommandHistory, shell.complete) end,
+            function() sLine = read(nil, tCommandHistory, shell.complete) end,
             function()
                 while true do
                     local change = 0
