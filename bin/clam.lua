@@ -247,7 +247,7 @@ local function completeProgram( sLine )
         -- Add programs from the root
         return fs.complete( sLine, "", true, false )
     else
-        local tResults = {}
+        local tResults = fs.complete( sLine, session.dir, true, false )
         local tSeen = {}
 
         -- Add aliases

@@ -12,10 +12,10 @@ end
 local function completeFile(shell, nIndex, sText, tPreviousText)
     return fs.complete(sText, shell.dir(), true, true)
 end
+
 local function completeDir(shell, nIndex, sText, tPreviousText)
     return fs.complete(sText, shell.dir(), false, true)
 end
-
 
 local function completeGlep(shell, nIndex, sText, tPreviousText)
     if nIndex > 1 then
