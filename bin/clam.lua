@@ -25,9 +25,9 @@ local tProgramStack = {}
 
 local shell = {}
 local tEnv = {
-    [ "shell" ] = shell,
-    [ "multishell" ] = multishell,
-    [ "read" ] = read
+    shell = shell,
+    multishell = multishell,
+    read = read
 }
 
 -- Settings handling
@@ -456,21 +456,11 @@ else
     local tCommandHistory = session.history
     local maxHistory = settings.maxHistory
 
-    -- Read commands and execute them
-    while not bExit do
-        term.redirect(thisBuffer)
-        thisBuffer.friendlyClear(true)
-
-        term.setBackgroundColor(termColors.bg)
-        term.setTextColor(termColors.prompt)
-
-        write( shell.dir() .. "> " )
-        term.setTextColor(termColors.text)
-
+    local function redirectRead(char, history, complete)
         local offset = 0
-        local sLine = nil
+        local line = nil
         parallel.waitForAny(
-            function() sLine = read(nil, tCommandHistory, shell.complete) end,
+            function() line = read(char, history, complete) end,
             function()
                 while true do
                     local change = 0
@@ -501,6 +491,23 @@ else
             end
         )
         if offset ~= 0 then thisBuffer.draw() end
+
+        return line
+    end
+    tEnv.read = redirectRead
+
+    -- Read commands and execute them
+    while not bExit do
+        term.redirect(thisBuffer)
+        thisBuffer.friendlyClear(true)
+
+        term.setBackgroundColor(termColors.bg)
+        term.setTextColor(termColors.prompt)
+
+        write( shell.dir() .. "> " )
+        term.setTextColor(termColors.text)
+
+        local sLine = redirectRead(nil, tCommandHistory, shell.complete)
 
         if not sLine then
             return
