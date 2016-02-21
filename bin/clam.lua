@@ -59,14 +59,13 @@ local function readSettings(path)
 end
 
 -- Load settings
-local termColors, settings, session
+local clamSettings, session
 do
+    local colorProperties = { "promptColor", "textColor", "bgColor" }
     local defaults = {
-        colors = {
-            prompt = colors.white,
-            text = colors.white,
-            bg = colors.black,
-        },
+        promptColor = "white",
+        textColor = "white",
+        bgColor = "black",
 
         aliases = {},
         env = {},
@@ -78,10 +77,18 @@ do
     }
 
     if term.isColor() then
-        defaults.colors.prompt = colors.lightBlue
+        defaults.promptColor = "lightBlue"
     end
 
-    settings = setmetatable(readSettings(clamSettingsPath) or {}, {__index = defaults})
+    clamSettings = readSettings(clamSettingsPath) or {}
+    for k, v in pairs(defaults) do
+        local value = clamSettings[k] or v
+        if settings and type(value) ~= "table" then
+            local value = settings.get("clam." .. k, value)
+            settings.set("clam." .. k, value)
+        end
+        clamSettings[k] = value
+    end
     session = readSettings(clamSessionPath) or {}
 
     -- Set session vars
@@ -94,26 +101,29 @@ do
     end
 
     -- Colors
-    termColors = setmetatable({}, {__index = defaults.colors})
     local validColors = {}
-    for i=0,16,1 do validColors[2^i] = true end
-    local validator = term.isColor() and
-        function(c) return validColors[c] end or
-        function(c) return color == colors.black or color == colors.white end
+    for i = 0, 16 do validColors[2^i] = true end
 
-    local defaultCols = defaults.colors
-    for name, color in pairs(settings.colors) do
+    local validator
+    if term.isColor() then
+        validator = function(c) return validColors[c] end
+    else
+        validator = function(c) return color == colors.black or color == colors.white end
+    end
+
+    for _, name in pairs(colorProperties) do
+        local color = clamSettings[name]
         if type(color) == "string" then
             color = colors[color] or colours[color]
         end
         if not color or not validator(color) then
-            color = defaultCols[name]
+            color = defaults[name]
         end
-        termColors[name] = color
+        clamSettings[name] = color
     end
 
     -- Aliases
-    local aliases = settings.aliases
+    local aliases = clamSettings.aliases
     if type(aliases) == "table" then
         for name, value in pairs(aliases) do
             if type(name) == "string" and type(value) == "string" then
@@ -123,7 +133,7 @@ do
     end
 
     -- Environment
-    local variables = settings.env
+    local variables = clamSettings.env
     if type(variables) == "table" then
         for name, value in pairs(variables) do
             if type(name) == "string" and type(value) == "string" then
@@ -439,14 +449,14 @@ else
 
     local thisBuffer = buffer.new(parentTerm)
     thisBuffer.bubble(true)
-    thisBuffer.maxScrollback(settings.maxScrollback)
+    thisBuffer.maxScrollback(clamSettings.maxScrollback)
     term.redirect(thisBuffer)
 
     -- Print the header
-    term.setBackgroundColor(termColors.bg)
-    term.setTextColor(termColors.prompt)
+    term.setBackgroundColor(clamSettings.bgColor)
+    term.setTextColor(clamSettings.promptColor)
     print(os.version(), " - ", shell.version())
-    term.setTextColor(termColors.text)
+    term.setTextColor(clamSettings.textColor)
 
     -- Run the startup program
     if parentShell == nil then
@@ -454,7 +464,7 @@ else
     end
 
     local tCommandHistory = session.history
-    local maxHistory = settings.maxHistory
+    local maxHistory = clamSettings.maxHistory
 
     local function redirectRead(char, history, complete)
         local offset = 0
@@ -468,9 +478,9 @@ else
                     if e == "mouse_scroll" then
                         change = eventArg
                     elseif e == "key" and eventArg == keys.pageDown then
-                        change = settings.pageScroll
+                        change = clamSettings.pageScroll
                     elseif e == "key" and eventArg == keys.pageUp then
-                        change = -settings.pageScroll
+                        change = -clamSettings.pageScroll
                     elseif e == "key" or e == "paste" then
                         -- Reset offset if another key is pressed
                         change = -offset
@@ -501,13 +511,17 @@ else
         term.redirect(thisBuffer)
         thisBuffer.friendlyClear(true)
 
-        term.setBackgroundColor(termColors.bg)
-        term.setTextColor(termColors.prompt)
+        term.setBackgroundColor(clamSettings.bgColor)
+        term.setTextColor(clamSettings.promptColor)
 
         write( shell.dir() .. "> " )
-        term.setTextColor(termColors.text)
+        term.setTextColor(clamSettings.textColor)
 
-        local sLine = redirectRead(nil, tCommandHistory, shell.complete)
+        local complete
+        if not settings or settings.get("shell.autocomplete") then
+            complete = shell.complete
+        end
+        local sLine = redirectRead(nil, tCommandHistory, complete)
 
         if not sLine then
             return

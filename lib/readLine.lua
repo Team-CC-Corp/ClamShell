@@ -79,29 +79,12 @@ function read(replaceChar, history, completeFunction, completionFore, completion
             clear()
 
             -- Find the common prefix of all the other suggestions which start with the same letter as the current one
-            local sCompletion = completions[currentCompletion]
-            local sFirstLetter = string.sub( sCompletion, 1, 1 )
-            local sCommonPrefix = sCompletion
-            for n=1,#completions do
-                local sResult = completions[n]
-                if n ~= currentCompletion and string.find(sResult, sFirstLetter, 1, true) == 1 then
-                    while #sCommonPrefix > 1 do
-                        if string.find(sResult, sCommonPrefix, 1, true) == 1 then
-                            break
-                        else
-                            sCommonPrefix = string.sub(sCommonPrefix, 1, #sCommonPrefix - 1)
-                        end
-                    end
-                end
-            end
-
-            -- Append this string
-            line = line .. sCommonPrefix
+            line = line .. completions[currentCompletion]
             pos = string.len(line)
-        end
 
-        recomplete()
-        redraw()
+            recomplete()
+            redraw()
+        end
     end
 
     local mappings = {
