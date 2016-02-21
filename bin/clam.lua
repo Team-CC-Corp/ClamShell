@@ -8,6 +8,8 @@ local buffer = grin.getPackageAPI(clamPkg, "buffer")
 local read = grin.getPackageAPI(clamPkg, "readLine").read
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
 
+if clamPath:sub(1, 1) ~= "/" then clamPath = "/" .. clamPath end
+
 if multishell then
     multishell.setTitle(multishell.getCurrent(), "shell")
 end
