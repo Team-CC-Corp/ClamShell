@@ -4,6 +4,8 @@ local parser = argparse.new()
 parser
     :argument"pattern"
 parser
+        :switch"n"
+parser
     :argument"files"
     :count"*"
 
@@ -11,6 +13,9 @@ local options = parser:parse({}, ...)
 if not options then
     return
 end
+
+local color = not options.n and term.isColour()
+local startColor = term.getTextColor()
 
 assert(options.pattern, "Usage: glep <pattern> [files]")
 
@@ -32,8 +37,17 @@ for i,fh in ipairs(files) do
             break
         end
 
-        if line:find(options.pattern) then
-            print(line)
+        local start, finish = line:find(options.pattern)
+        if start then
+            if color then
+                write(line:sub(1, start - 1))
+                term.setTextColour(colors.red)
+                write(line:sub(start, finish))
+                term.setTextColour(startColor)
+                print(line:sub(finish + 1))
+            else
+                print(line)
+            end
         end
     end
 
