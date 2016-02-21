@@ -458,11 +458,6 @@ else
     print(os.version(), " - ", shell.version())
     term.setTextColor(clamSettings.textColor)
 
-    -- Run the startup program
-    if parentShell == nil then
-        shell.run( "/rom/startup" )
-    end
-
     local tCommandHistory = session.history
     local maxHistory = clamSettings.maxHistory
 

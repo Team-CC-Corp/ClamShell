@@ -52,7 +52,7 @@ function runCommand(node, tEnv, shell)
             local CLOSE = {}
 
             stdout = {isPiped=true, writeLine=print}
-            next_stdin = {}
+            next_stdin = {isPiped=true}
             function stdout.write(s)
                 grin.expect("string", s)
                 local nLines = 0
@@ -150,6 +150,7 @@ function runCommand(node, tEnv, shell)
                 end
                 _G.write = cmd.stdout.write
                 _G.read = cmd.stdin.readLine
+                tEnv.read = cmd.stdin.readLine
                 _G.stdout = cmd.stdout
                 _G.stdin = cmd.stdin
                 _G.stderr = cmd.stderr
@@ -163,6 +164,7 @@ function runCommand(node, tEnv, shell)
                 _G.print = oldPrint
                 _G.write = oldWrite
                 _G.read = oldRead
+                tEnv.read = oldRead
                 _G.stdout = oldStdout
                 _G.stdin = oldStdin
                 _G.stderr = oldStderr
