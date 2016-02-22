@@ -239,7 +239,7 @@ function shell.programs( _bIncludeHidden )
             for n,sFile in pairs( tList ) do
                 if not fs.isDir( fs.combine( sPath, sFile ) ) and
                    (_bIncludeHidden or string.sub( sFile, 1, 1 ) ~= ".") then
-                    tItems[ sFile ] = true
+                    tItems[ sFile:gsub("%.lua$", "") ] = true
                 end
             end
         end

@@ -28,7 +28,7 @@ function read(replaceChar, history, completeFunction, completionFore, completion
         currentCompletion = nil
     end
 
-    local w = term.getSize()
+    local w, h = term.getSize()
     local sx = term.getCursorPos()
 
     local function redraw(clear)
@@ -299,7 +299,12 @@ function read(replaceChar, history, completeFunction, completionFore, completion
 
     local cx, cy = term.getCursorPos()
     term.setCursorBlink(false)
-    term.setCursorPos(1, cy + 1)
+    if cy >= h then
+        term.scroll(1)
+        term.setCursorPos(1, cy)
+    else
+        term.setCursorPos(1, cy + 1)
+    end
 
     return line
 end
