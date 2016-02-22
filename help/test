@@ -1,0 +1,12 @@
+NAME
+  test - check file types and compare values
+
+SYNOPSIS
+  test [-d|-e|-f] [FILE]
+
+DESCRIPTION
+  Assert the FILE either exists or is a particular type.
+
+  -d Assert it is a directory
+  -e Assert the file exists
+  -f Assert it is a file

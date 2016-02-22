@@ -1,0 +1,10 @@
+NAME
+  echo - display a line of text
+
+SYNOPSIS
+  echo [SHORT-OPTION]... [STRING]...
+
+DESCRIPTION
+  Echo the STRING(s) to standard output.
+
+  -n do not output the trailing newline

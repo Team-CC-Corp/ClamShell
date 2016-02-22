@@ -1,0 +1,8 @@
+NAME
+  xargs - build and execute command lines from standard input
+
+SYNOPSIS
+    xargs [COMMAND] [ARGS]...
+
+DESCRIPTION
+  Run COMMAND with arguments ARGS and arguments parsed from standard input

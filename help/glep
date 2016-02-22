@@ -1,0 +1,10 @@
+NAME
+  glep - print lines matching a pattern
+
+SYNOPSIS
+  glep [OPTIONS] PATTERN [FILE...]
+
+DESCRIPTION
+  glep searches the named input FILEs for lines containing a match to the given Lua PATTERN.
+
+  -n do not highlighted strings
