@@ -19,10 +19,10 @@ local function run(tEnv, shell, program, ...)
 end
 
 function runCommand(node, tEnv, shell)
-    local read = tEnv.read or read
+    local envRead = tEnv.read or read
     local cmds = {}
 
-    local stdin = {readLine=read,close=function()end}
+    local stdin = {readLine=envRead,close=function()end}
     local stderr = {write=write,flush=function()end,close=function()end}
     function stderr.writeLine(...)
         if term.isColor() then
@@ -94,7 +94,7 @@ function runCommand(node, tEnv, shell)
 
             curNode = curNode.pipeOut.statement
         elseif curNode.filePipeOut then
-            local fname = curNode.filePipeOut
+            local fname = shell.resolve(curNode.filePipeOut)
             local writeType
             if curNode.filePipeOutAppend then
                 writeType = "a"
@@ -164,7 +164,7 @@ function runCommand(node, tEnv, shell)
                 _G.print = oldPrint
                 _G.write = oldWrite
                 _G.read = oldRead
-                tEnv.read = oldRead
+                tEnv.read = envRead
                 _G.stdout = oldStdout
                 _G.stdin = oldStdin
                 _G.stderr = oldStderr

@@ -299,8 +299,7 @@ function read(replaceChar, history, completeFunction, completionFore, completion
 
     local cx, cy = term.getCursorPos()
     term.setCursorBlink(false)
-    term.setCursorPos(w + 1, cy)
-    print()
+    term.setCursorPos(1, cy + 1)
 
     return line
 end

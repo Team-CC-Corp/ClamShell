@@ -501,6 +501,7 @@ else
 
         return line
     end
+
     tEnv.read = redirectRead
 
     -- Read commands and execute them

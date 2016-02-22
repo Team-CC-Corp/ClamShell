@@ -4,6 +4,41 @@ if select('#', ...) > 0 then
 	return
 end
 
+if stdin and stdin.isPiped then
+	local buffer, n = {}, 0
+
+	while true do
+		local line = read()
+		if not line then break end
+
+		n = n + 1
+		buffer[n] = line
+	end
+
+	local line = table.concat(buffer)
+	local forcePrint = false
+	local func, err = load(line, "lua", "t", thisEnv)
+	local func2, err2 = load("return " .. line, "lua", "t", thisEnv)
+	if not func then
+		if func2 then
+			func = func2
+			forcePrint = true
+		end
+	else
+		if func2 then
+			func = func2
+		end
+	end
+
+	if func then
+		func()
+	else
+		error(err)
+	end
+
+	return
+end
+
 local keywords = {
 	[ "and" ] = true, [ "break" ] = true, [ "do" ] = true, [ "else" ] = true,
 	[ "elseif" ] = true, [ "end" ] = true, [ "false" ] = true, [ "for" ] = true,
@@ -138,6 +173,7 @@ while running do
 	term.setTextColour(textColour)
 
 	local line = read(nil, history, autocomplete)
+	if not line then return end
 
 	if #line:gsub("%s", "") > 0 then
 		for i = #history, 1, -1 do
