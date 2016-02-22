@@ -304,7 +304,13 @@ local function findCommand(node)
     local type = node.type
 
     if type == "command" then
-        return node.command
+        if node.pipeOut then
+            return findCommand(node.pipeOut)
+        elseif node.filePipeOut then
+            return true, node.filePipeOut
+        else
+            return false, node.command
+        end
     elseif type == "array_element" then
         return findCommand(node.statement)
     elseif type == "chunk" then
@@ -312,8 +318,11 @@ local function findCommand(node)
         return findCommand(node[#node])
     elseif type == "root" then
         return findCommand(node.chunk)
+    elseif type == "pipe_out" then
+        return findCommand(node.statement)
+    else
+        print(type)
     end
-
 end
 
 function shell.complete( sLine )
@@ -321,8 +330,12 @@ function shell.complete( sLine )
         local success, root = pcall(bish.parse, sLine)
         if not success then return nil end
 
-        local tWords = findCommand(root)
+        local isFile, tWords = findCommand(root)
         if not tWords then return nil end
+
+        if isFile then
+            return fs.complete(tWords, session.dir)
+        end
 
         local nIndex = #tWords
         if string.sub( sLine, #sLine, #sLine ) == " " then
