@@ -1,0 +1,15 @@
+NAME
+  wc - print newline, word, and byte counts for each file
+
+SYNOPSIS
+  wc [OPTION]... [FILE]...
+
+DESCRIPTION
+  Print newline, word, and byte counts for each FILE, and a total line if more than one FILE is specified. With no FILE read standard input.
+
+  A word is a non-zero-length sequence of characters delimited by white space. The options below may be used to select which counts are printed, always in the following order: newline, word, character, byte, maximum line length.
+
+  -c, --bytes           print the byte counts
+  -l, --lines           print the newline counts
+  -L, --max-line-length print the length of the longest line
+  -w, --words           print the word counts

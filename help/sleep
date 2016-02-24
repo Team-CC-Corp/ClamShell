@@ -1,0 +1,8 @@
+NAME
+  sleep - delay for a specified amount of time
+
+SYNOPSIS
+  sleep NUMBER...
+
+DESCRIPTION
+  Pause for NUMBER seconds. Given two or more arguments, pause for the amount of time specified by the sum of their values.

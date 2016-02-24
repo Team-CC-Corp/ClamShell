@@ -16,6 +16,9 @@
         <copy todir="build/clamshell/tools">
             <fileset dir="tools" />
         </copy>
+        <copy todir="build/clamshell/help">
+            <fileset dir="help" />
+        </copy>
         <zip zip64Mode="never" destfile="build/clamshell.zip" basedir="build/clamshell" />
     </target>
 

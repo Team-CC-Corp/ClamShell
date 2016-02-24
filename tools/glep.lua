@@ -4,7 +4,7 @@ local parser = argparse.new()
 parser
     :argument"pattern"
 parser
-        :switch"n"
+    :switch"n"
 parser
     :argument"files"
     :count"*"
