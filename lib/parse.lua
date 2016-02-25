@@ -1,16 +1,33 @@
-local function createLookup(tbl)
-	for _, v in ipairs(tbl) do
-		tbl[v] = true
-	end
-	return tbl
-end
+-- Yep. This is some horrible code. Move on please
 
-local commandSymbols = createLookup { "|", ">", "{", "}", "=", "\"", "'", ";", "$", "(", ")" }
-local stringSymbols = createLookup { "|", ">", "{", "}", "\"", "'", ";", "$", "(", ")" }
+local function createLookup(...)
+	local out = {}
+
+	for _, tbl in ipairs({...}) do
+		for _, v in ipairs(tbl) do
+			out[v] = true
+		end
+	end
+	return out
+end
+local symbols = {
+	"{", "}", ";",        -- Blocks
+	"\"", "'", "\\", "$", -- Strings
+	"|", ">", "&",        -- Piping
+	"(", ")",             -- Generic
+}
+
+local commandSymbols = createLookup(symbols, {"="})
+local stringSymbols = createLookup(symbols)
+
+local terminators = createLookup { "{", "}", ";", ")" }
+local pipe = createLookup { "|", ">", "&" }
+
 local keywords = createLookup { "for", "while", "if", "elseif", "else" }
 
-local x = function(text)
+return function(text, filename, fancyHandling)
 	local line, char, pointer = 1, 1, 1
+	filename = filename or "stdin"
 
 	local function get()
 		local c = text:sub(pointer,pointer)
@@ -36,9 +53,22 @@ local x = function(text)
 			resumable = 0
 		end
 
-		print(text)
-		print((" "):rep(pointer - 1) .. "^")
-		error(line..":"..char..":"..resumable..":"..err, 0)
+		local count, current = 0, ""
+		for contents in text:gmatch("[^\r\n]+") do
+			count = count + 1
+			if count == line then
+				current = contents
+			end
+		end
+
+		if fancyHandling then
+			error(line..":"..char..":"..resumable..":"..err, 0)
+		else
+			print()
+			print(current)
+			print((" "):rep(char - 1) .. "^")
+			error(filename .. ":" .. line..":"..char..": "..err, 0)
+		end
 	end
 
 	local function eatWhitespace()
@@ -50,9 +80,8 @@ local x = function(text)
 	end
 
 	local function expect(char)
-		local c = peek()
-		if c ~= char then
-			generateError(("Expected %q, got %q"):format(char, c))
+		if peek() ~= char then
+			generateError(("Expected %q"):format(char))
 		end
 
 		get()
@@ -70,10 +99,10 @@ local x = function(text)
 		end
 	end
 
-	local command, statement
+	local command, statement, expression
 
 	local function dollar()
-		get()
+		expect("$")
 
 		local start = pointer
 		local c = peek()
@@ -99,8 +128,6 @@ local x = function(text)
 	end
 
 	local function string(symbols, name)
-		eatWhitespace()
-
 		local c = peek()
 
 		if c == "'" then
@@ -128,12 +155,14 @@ local x = function(text)
 				get()
 			end
 
-			return { table.concat(buffer) }
+			eatWhitespace()
+
+			return { tag = "string", table.concat(buffer) }
 		elseif c == '"' then
 			get()
 			local start = pointer
 			local buffer, n = {}, 0
-			local out, outN = {}, 0
+			local out, outN = { tag = "compound" }, 0
 
 			while true do
 				c = peek()
@@ -171,9 +200,24 @@ local x = function(text)
 				out[outN] = table.concat(buffer)
 			end
 
-			return out
+			eatWhitespace()
+
+			if outN == 0 then
+				return { tag = "string", "" }
+			elseif outN == 1 then
+				local val = out[1]
+				if type(val) == "string" then
+					return { tag = "string", val }
+				else
+					return out[1]
+				end
+			else
+				return out
+			end
 		elseif c == "$" then
-			return dollar()
+			local token = dollar()
+			eatWhitespace()
+			return token
 		else
 			local start = pointer
 
@@ -187,69 +231,116 @@ local x = function(text)
 			end
 
 			local str = text:sub(start, pointer - 1)
+			eatWhitespace()
+
 			if keywords[str] then
-				return { { tag = "keyword", str} }
+				return { tag = "keyword", str }
 			else
-				return { str }
+				return { tag = "string", str }
 			end
+		end
+	end
+
+	local function parsePipe(current)
+		if consume(">>") then
+			return { tag = "append", current, string(stringSymbols, "filename") }
+		elseif consume(">") then
+			return { tag = "write", current, string(stringSymbols, "filename") }
+		elseif consume("||") then
+			return { tag = "or", current, expression() }
+		elseif consume("&&") then
+			return { tag = "and", current, expression() }
+		elseif consume("|") then
+			return { tag = "pipe", current, expression() }
+		else
+			generateError("Expected pipe")
+		end
+	end
+
+	expression = function()
+		if consume("(") then
+			local cmd = command()
+			expect(')')
+
+			local c = peek()
+			if c == "" or terminators[c] then
+				return cmd
+			elseif pipe[c] then
+				return parsePipe(current)
+			else
+				return cmd
+			end
+		else
+			return command()
 		end
 	end
 
 	command = function(initial)
 		if not initial then
 			initial = string(commandSymbols, "command")
-			if type(initial[1]) == "table" and initial[1].tag == "keyword" then
+			if initial.tag == "keyword" then
 				generateError("Unexpected keyword", 0)
 			end
 		end
 
-		local command = { tag = "command", initial }
+		local current = { tag = "command", initial }
 		local n = 1
 
 		while true do
-			eatWhitespace()
-
 			local c = peek()
-			if c == "" or stringSymbols[c] then
+			if c == "" or terminators[c] then
 				break
+			elseif pipe[c] then
+				return parsePipe(current)
 			end
 
 			n = n + 1
-			command[n] = string(stringSymbols, "argument")
+			current[n] = string(stringSymbols, "argument")
 		end
 
-		return command
+		return current
 	end
 
 	local function block()
 		local block, n = {}, 0
+
+		local c = peek()
+		if c == '' or c == '}' then
+			return block
+		end
+
 		while true do
-			while consume(';') do end
+			n = n + 1
+			block[n] = statement()
 
 			local c = peek()
 			if c == '' or c == '}' then
 				break
+			elseif c == ';' then
+				get()
+				eatWhitespace()
+			else
+				generateError("Expected ;")
 			end
 
-			n = n + 1
-			block[n] = statement()
+			-- Allow trailing ; on block
+			c = peek()
+			if c == '' or c == '}' then break end
 		end
-
-		while consume(';') do end
 
 		return block
 	end
 
 	statement = function()
-		local first = string(commandSymbols, "command")
-		eatWhitespace()
+		if peek() == "(" then return expression() end
 
-		if type(first[1]) == "table" and first[1].tag == "keyword" then
-			local keyword = first[1][1]
+		local first = string(commandSymbols, "command")
+
+		if first.tag == "keyword" then
+			local keyword = first[1]
 
 			if keyword == "if" then
 				local conditional = command()
-
 				expect("{")
 				local body = block()
 				expect("}")
@@ -259,9 +350,7 @@ local x = function(text)
 				while true do
 					if consume("else") then
 						expect("{")
-
 						local body = block()
-
 						expect("}")
 
 						n = n + 1
@@ -270,7 +359,6 @@ local x = function(text)
 						break
 					elseif consume("elseif") then
 						local conditional = command()
-
 						expect("{")
 						local body = block()
 						expect("}")
@@ -285,35 +373,24 @@ local x = function(text)
 				return tag
 			elseif keyword == "while" then
 				local command = command()
-
 				expect("{")
 				local body = block()
-
 				expect("}")
 
 				return { tag = "while", command, body }
 			elseif keyword == "for" then
 				local var = string(commandSymbols, "string")
-				eatWhitespace()
 				expect("=")
-
 				local command = command()
-
 				expect("{")
-
 				local body = block()
-
 				expect("}")
-				eatWhitespace()
 
 				return { tag = "for", var, command, body }
 			else
 				print("Unexpected keyword " .. keyword)
 			end
-		elseif peek() == '=' then
-			get()
-			eatWhitespace()
-
+		elseif consume("=") then
 			return {
 				tag = "set",
 				first,
@@ -334,12 +411,3 @@ local x = function(text)
 
 	return body
 end
-
-
-x [["foobar $foo bar $(echo)"]]
-x [['foobar']]
-x [[if echo { cat "foobar"; echo } else { echo; echo; }]]
-x [[while echo { cat "foobar" } ]]
-x [[for var = foo { cat $var } ]]
-x [[foobar-baz=another baz]]
-x [[echo $foobar]]
