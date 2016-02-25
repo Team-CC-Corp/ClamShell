@@ -525,7 +525,22 @@ else
         term.setBackgroundColor(clamSettings.bgColor)
         term.setTextColor(clamSettings.promptColor)
 
-        write( shell.dir() .. "> " )
+        local dir = shell.dir()
+        -- Try to shorten directory so we can actually see the prompt
+        if #dir > 20 then
+            local first = dir:find("/")
+            if not first or first > 15 then
+                first = 12
+            end
+
+            local last = dir:find("/[^/]*$")
+            if not last or last < (#dir - 15) then
+                last = #dir - 12
+            end
+
+            dir = dir:sub(1, first) .. "..." .. dir:sub(last, #dir)
+        end
+        write( dir .. "> " )
         term.setTextColor(clamSettings.textColor)
 
         local complete

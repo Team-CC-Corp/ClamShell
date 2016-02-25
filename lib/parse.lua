@@ -109,7 +109,7 @@ return function(text, filename, fancyHandling)
 
 		if c == '(' then
 			get()
-			local res = command()
+			local res = expression()
 			expect(')')
 
 			return res
@@ -340,7 +340,7 @@ return function(text, filename, fancyHandling)
 			local keyword = first[1]
 
 			if keyword == "if" then
-				local conditional = command()
+				local conditional = expression()
 				expect("{")
 				local body = block()
 				expect("}")
@@ -358,7 +358,7 @@ return function(text, filename, fancyHandling)
 
 						break
 					elseif consume("elseif") then
-						local conditional = command()
+						local conditional = expression()
 						expect("{")
 						local body = block()
 						expect("}")
@@ -372,7 +372,7 @@ return function(text, filename, fancyHandling)
 
 				return tag
 			elseif keyword == "while" then
-				local command = command()
+				local command = expression()
 				expect("{")
 				local body = block()
 				expect("}")
@@ -381,7 +381,7 @@ return function(text, filename, fancyHandling)
 			elseif keyword == "for" then
 				local var = string(commandSymbols, "string")
 				expect("=")
-				local command = command()
+				local command = expression()
 				expect("{")
 				local body = block()
 				expect("}")

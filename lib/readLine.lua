@@ -79,8 +79,25 @@ function read(replaceChar, history, completeFunction, completionFore, completion
             clear()
 
             -- Find the common prefix of all the other suggestions which start with the same letter as the current one
-            line = line .. completions[currentCompletion]
-            pos = string.len(line)
+            local completion = completions[currentCompletion]
+            local firstLetter = completion:sub(1, 1)
+            local commonPrefix = completion
+            for n=1, #completions do
+                local result = completions[n]
+                if n ~= currentCompletion and result:find(firstLetter, 1, true) == 1 then
+                    while #commonPrefix > 1 do
+                        if result:find(commonPrefix, 1, true) == 1 then
+                            break
+                        else
+                            commonPrefix = commonPrefix:sub(1, #commonPrefix - 1)
+                        end
+                    end
+                end
+            end
+
+            -- Append this string
+            line = line .. commonPrefix
+            pos = #line
 
             recomplete()
             redraw()
