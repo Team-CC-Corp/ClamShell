@@ -1,4 +1,4 @@
-function read(replaceChar, history, completeFunction, completionFore, completionBack)
+function read(replaceChar, history, completeFunction)
     term.setCursorBlink(true)
 
     local line = ""
@@ -48,12 +48,10 @@ function read(replaceChar, history, completeFunction, completionFore, completion
 
         if currentCompletion then
             local sCompletion = completions[currentCompletion]
-            local oldText, oldBg
+            local oldText
             if not clear then
                 oldText = term.getTextColor()
-                oldBg = term.getBackgroundColor()
-                term.setTextColor(completionFore or colors.white)
-                term.setBackgroundColor(completionBack or colors.gray)
+                term.setTextColor(completionFore or colors.gray)
             end
             if sReplace then
                 term.write(string.rep(sReplace, string.len(sCompletion)))
@@ -62,7 +60,6 @@ function read(replaceChar, history, completeFunction, completionFore, completion
             end
             if not clear then
                 term.setTextColor(oldText)
-                term.setBackgroundColor(oldBg)
             end
         end
 

@@ -153,9 +153,11 @@ end
 function shell.run( ... )
     local f, err = bish.compile(tEnv, shell, table.concat({...}, " "))
     if f then
-        local ok, err = f()
+        local ok, param = f()
         if not ok then
-            printError(err)
+            printError(param)
+            return false
+        elseif not param then
             return false
         else
             return true
