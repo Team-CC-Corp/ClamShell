@@ -36,6 +36,7 @@ local tEnv = {
 -- Settings handling
 local clamSettingsPath = ".clam.settings"
 local clamSessionPath = ".clam.session"
+local clamPrompt = ".clam.prompt"
 
 local function writeSettings(path, table)
     if not table then return end
@@ -463,6 +464,38 @@ if #tArgs > 0 then
 
 else
     -- "shell"
+
+    local printPrompt
+    if fs.exists(clamPrompt) then
+        local result = dofile(clamPrompt)
+        if type(result) ~= "table" then
+            error("Expected table from clam prompt, got " .. type(result))
+        end
+
+        printPrompt = result.prompt
+    end
+
+    if not printPrompt then
+        printPrompt = function(shell, previousSuccess, clamSettings)
+            local dir = shell.dir()
+            -- Try to shorten directory so we can actually see the prompt
+            if #dir > 20 then
+                local first = dir:find("/")
+                if not first or first > 15 then
+                    first = 12
+                end
+
+                local last = dir:find("/[^/]*$")
+                if not last or last < (#dir - 15) then
+                    last = #dir - 12
+                end
+
+                dir = dir:sub(1, first) .. "..." .. dir:sub(last, #dir)
+            end
+            write( dir .. "> " )
+        end
+    end
+
     -- Buffer
     term.clear()
     term.setCursorPos(1, 1)
@@ -522,6 +555,8 @@ else
 
     tEnv.read = redirectRead
 
+    local previousSuccess = true
+
     -- Read commands and execute them
     while not bExit do
         term.redirect(thisBuffer)
@@ -529,23 +564,7 @@ else
 
         term.setBackgroundColor(clamSettings.bgColor)
         term.setTextColor(clamSettings.promptColor)
-
-        local dir = shell.dir()
-        -- Try to shorten directory so we can actually see the prompt
-        if #dir > 20 then
-            local first = dir:find("/")
-            if not first or first > 15 then
-                first = 12
-            end
-
-            local last = dir:find("/[^/]*$")
-            if not last or last < (#dir - 15) then
-                last = #dir - 12
-            end
-
-            dir = dir:sub(1, first) .. "..." .. dir:sub(last, #dir)
-        end
-        write( dir .. "> " )
+        printPrompt(shell, previousSuccess, clamSettings)
         term.setTextColor(clamSettings.textColor)
 
         local complete
@@ -574,12 +593,17 @@ else
             writeSettings(clamSessionPath, session)
         end
 
-        parallel.waitForAny(function () shell.run( sLine ) end, function()
-            while true do
-                os.pullEvent("term_resize")
-                thisBuffer.updateSize()
-                thisBuffer.draw(offset)
+        parallel.waitForAny(
+            function ()
+                previousSuccess = shell.run( sLine )
+            end,
+            function()
+                while true do
+                    os.pullEvent("term_resize")
+                    thisBuffer.updateSize()
+                    thisBuffer.draw(offset)
+                end
             end
-        end)
+        )
     end
 end

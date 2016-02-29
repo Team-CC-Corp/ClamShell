@@ -64,16 +64,14 @@ local function run(tEnv, shell, program, ...)
                 if err and err ~= "" then
                     printError( err )
                 end
-                r = false
+                return false
             end
-            r = true
+            return true
         end
         if err and err ~= "" then
             printError( err )
         end
-        r = false
-
-        return r
+        return false
     end
 end
 

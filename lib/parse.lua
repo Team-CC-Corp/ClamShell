@@ -70,9 +70,9 @@ function parse(text, filename, fancyHandling)
 		if fancyHandling then
 			error(line..":"..char..":"..resumable..":"..err, 0)
 		else
-			print()
-			print(current)
-			print((" "):rep(char - 1) .. "^")
+			if term.getCursorPos() ~= 1 then print() end
+			print(" " .. current)
+			print((" "):rep(char) .. "^")
 			error(filename .. ":" .. line..":"..char..": "..err, 0)
 		end
 	end
@@ -382,7 +382,7 @@ function parse(text, filename, fancyHandling)
 
 				return { tag = "while", command, body }
 			elseif keyword == "for" then
-				local var = string(commandSymbols, "string")
+				local var = string(commandSymbols, "variable")
 				expect("=")
 				local command = expression()
 				expect("{")
