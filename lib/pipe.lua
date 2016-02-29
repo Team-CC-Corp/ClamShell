@@ -10,10 +10,10 @@ local function doWrite(write, ...)
     local n = select('#', ...)
     for i = 1, n do
         if i > 1 then
-            sum = sum + write("\t")
+            sum = sum + (write("\t") or 0)
         end
 
-        sum = sum + write(tostring(select(n, ...)))
+        sum = sum + (write(tostring(select(n, ...))) or 0)
     end
 
     return sum
@@ -54,6 +54,8 @@ function stdErr()
 
         return n
     end
+
+    return stderr
 end
 
 --- An output that redirects to a file
@@ -64,7 +66,7 @@ function fileOut(path, mode)
         mode = "w"
     end
 
-    local stdout = fs.open(fname, writeType)
+    local stdout = fs.open(path, mode)
     if not stdout then error("File could not be opened: " .. fname, 0) end
 
     local oldWriteLine = stdout.writeLine
@@ -91,7 +93,7 @@ function linesOut()
 
         local pos, len = 1, #s
         while pos <= len do
-            local newPos = s:find("\n")
+            local newPos = s:find("\n", pos)
 
             if newPos then
                 insert(lines, lineBuffer .. s:sub(pos, newPos - 1))
@@ -125,7 +127,7 @@ function linesOut()
 end
 
 --- A command pipe
-local function pipe()
+function pipe()
     local lineBuffer = ""
     local lines = {}
     local CLOSE = {}
@@ -138,7 +140,7 @@ local function pipe()
 
         local pos, len = 1, #s
         while pos <= len do
-            local newPos = s:find("\n")
+            local newPos = s:find("\n", pos)
 
             if newPos then
                 insert(lines, lineBuffer .. s:sub(pos, newPos - 1))
@@ -187,4 +189,12 @@ local function pipe()
     end
 
     return stdout, next_stdin
+end
+
+function createPrint(stream)
+    return function(...)
+        local lines = stream.writeLine(...)
+        stream.flush()
+        return lines
+    end
 end

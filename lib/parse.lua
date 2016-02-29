@@ -17,6 +17,12 @@ local symbols = {
 	"(", ")",             -- Generic
 }
 
+local escapes = {
+	['n'] = '\n',
+	['r'] = '\r',
+	['t'] = '\t',
+}
+
 local commandSymbols = createLookup(symbols, {"="})
 local stringSymbols = createLookup(symbols)
 
@@ -25,7 +31,7 @@ local pipe = createLookup { "|", ">", "&" }
 
 local keywords = createLookup { "for", "while", "if", "elseif", "else" }
 
-return function(text, filename, fancyHandling)
+function parse(text, filename, fancyHandling)
 	local line, char, pointer = 1, 1, 1
 	filename = filename or "stdin"
 
@@ -144,6 +150,7 @@ return function(text, filename, fancyHandling)
 				elseif c == '\\' then
 					get()
 					c = peek()
+					c = escapes[c] or c
 				elseif c == "'" then
 					get()
 					break
@@ -176,7 +183,7 @@ return function(text, filename, fancyHandling)
 				elseif c == '$' then
 					if n > 0 then
 						outN = outN + 1
-						out[outN] = table.concat(buffer)
+						out[outN] = { tag = "string", table.concat(buffer) }
 						buffer = {}
 						n = 0
 					end
@@ -187,6 +194,7 @@ return function(text, filename, fancyHandling)
 					if c == '\\' then
 						get()
 						c = peek()
+						c = escapes[c] or c
 					end
 
 					n = n + 1
@@ -197,7 +205,7 @@ return function(text, filename, fancyHandling)
 
 			if n > 0 then
 				outN = outN + 1
-				out[outN] = table.concat(buffer)
+				out[outN] = { tag = "string", table.concat(buffer) }
 			end
 
 			eatWhitespace()
@@ -205,12 +213,7 @@ return function(text, filename, fancyHandling)
 			if outN == 0 then
 				return { tag = "string", "" }
 			elseif outN == 1 then
-				local val = out[1]
-				if type(val) == "string" then
-					return { tag = "string", val }
-				else
-					return out[1]
-				end
+				return out[1]
 			else
 				return out
 			end

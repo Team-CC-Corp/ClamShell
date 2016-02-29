@@ -1,5 +1,5 @@
 describe("parser tests", function()
-    local parse = dofile(shell.resolve("lib/parse.lua"))
+    dofile(shell.resolve("lib/parse.lua"))
 
     describe("command", function()
         it("string", function()

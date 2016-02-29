@@ -2,11 +2,12 @@ local multishell = multishell
 local parentShell = shell
 local parentTerm = term.current()
 local clamPkg = grin.packageFromExecutable(parentShell.getRunningProgram())
-local bish = grin.getPackageAPI(clamPkg, "bish")
-local BishInterpreter = grin.getPackageAPI(clamPkg, "BishInterpreter")
 local buffer = grin.getPackageAPI(clamPkg, "buffer")
-local read = grin.getPackageAPI(clamPkg, "readLine").read
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
+local interpreter = grin.getPackageAPI(clamPkg, "interpreter")
+local parse = grin.getPackageAPI(clamPkg, "parse")
+local read = grin.getPackageAPI(clamPkg, "readLine").read
+local utils = grin.getPackageAPI(clamPkg, "utils")
 
 if clamPath:sub(1, 1) ~= "/" then clamPath = "/" .. clamPath end
 
@@ -151,7 +152,7 @@ end
 
 -- Install shell API
 function shell.run( ... )
-    local f, err = bish.compile(tEnv, shell, table.concat({...}, " "))
+    local f, err = interpreter.compile(table.concat({...}, " "), "in", false, tEnv, shell)
     if f then
         local ok, param = f()
         if not ok then
@@ -303,19 +304,15 @@ local function completeProgramArgument( sProgram, nArgument, sPart, tPreviousPar
 end
 
 local function findCommand(node)
-    local type = node.type
+    local type = node.tag
 
     if type == "command" then
-        if node.pipeOut then
-            return findCommand(node.pipeOut)
-        elseif node.filePipeOut then
-            return true, node.filePipeOut
-        else
-            return false, node.command
-        end
-    elseif type == "array_element" then
-        return findCommand(node.statement)
-    elseif type == "chunk" then
+        return false, node
+    elseif type == "write"  or type == "append" then
+        return true, node[2]
+    elseif type == "pipe" or type == "and" or type == "or" then
+        return findCommand(node[2])
+    elseif type == nil then
         if #node == 0 then return nil end
         return findCommand(node[#node])
     elseif type == "root" then
@@ -323,21 +320,27 @@ local function findCommand(node)
     elseif type == "pipe_out" then
         return findCommand(node.statement)
     else
-        print(type)
+        return nil
     end
 end
 
 function shell.complete( sLine )
     if #sLine > 0 then
-        local success, root = pcall(bish.parse, sLine)
+        local success, root = pcall(parse.parse, sLine, "<in>", true)
         if not success then return nil end
 
-        local isFile, tWords = findCommand(root)
-        if not tWords then return nil end
+        local isFile, tNodes = findCommand(root)
+        if not tNodes then return nil end
 
         if isFile then
-            return fs.complete(tWords, session.dir)
+            if tNodes.tag ~= "string" then
+                return nil
+            end
+
+            return fs.complete(tNodes[1], session.dir)
         end
+
+        local tWords = utils.map(tNodes, interpreter.resolveArgumentStatic, shell)
 
         local nIndex = #tWords
         if string.sub( sLine, #sLine, #sLine ) == " " then

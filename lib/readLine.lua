@@ -51,7 +51,7 @@ function read(replaceChar, history, completeFunction)
             local oldText
             if not clear then
                 oldText = term.getTextColor()
-                term.setTextColor(completionFore or colors.gray)
+                term.setTextColor(colors.gray)
             end
             if sReplace then
                 term.write(string.rep(sReplace, string.len(sCompletion)))
