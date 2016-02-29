@@ -1,0 +1,9 @@
+NAME
+  timeit - times the specified command
+
+SYNOPSIS
+  timeit [COMMAND]
+
+DESCRIPTION
+  Execute the [COMMAND] (this can be a single command, or a whole shell script)
+  and show how long it took.

@@ -37,7 +37,7 @@ describe("parser tests", function()
             assert.same(
                 { { tag = "command",
                     { tag = "compound",
-                        "foo bar ",
+                        { tag = "string", "foo bar "},
                         { tag = "variable", "baz"}
                     }
                 } },
