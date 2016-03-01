@@ -52,26 +52,7 @@ local function run(tEnv, shell, program, ...)
             return err
         end
     else
-        local tArgs = { ... }
-        setmetatable( tEnv, { __index = _G } )
-        local r
-        local fnFile, err = loadfile( program, tEnv )
-        if fnFile then
-            local ok, err = pcall( function()
-                fnFile( table.unpack( tArgs ) )
-            end )
-            if not ok then
-                if err and err ~= "" then
-                    printError( err )
-                end
-                return false
-            end
-            return true
-        end
-        if err and err ~= "" then
-            printError( err )
-        end
-        return false
+        return os.run(tEnv, program, ...)
     end
 end
 
