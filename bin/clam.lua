@@ -85,10 +85,11 @@ do
     end
 
     clamSettings = readSettings(clamSettingsPath) or {}
+    if settings then settings.load(".settings") end
     for k, v in pairs(defaults) do
         local value = clamSettings[k] or v
         if settings and type(value) ~= "table" then
-            local value = settings.get("clam." .. k, value)
+            value = settings.get("clam." .. k, value)
             settings.set("clam." .. k, value)
         end
         clamSettings[k] = value
