@@ -1,21 +1,28 @@
-function read(replaceChar, history, completeFunction)
+function read(replaceChar, history, completeFunction, default)
     term.setCursorBlink(true)
 
-    local line = ""
-    local pos = 0
-    local historyPos = nil
+    local line
+    if type(default) == "string" then
+        line = default
+    else
+        line = ""
+    end
+    local historyPos
+    local pos = #line
+    local downKeys = {}
+    local modifier = 0
     if replaceChar then
-        replaceChar = string.sub(replaceChar, 1, 1)
+        replaceChar = replaceChar:sub(1, 1)
     end
 
-    local completions, currentCompletion = nil, nil
+    local completions, currentCompletion
     local function recomplete()
-        if completeFunction and pos == string.len(line) then
+        if completeFunction and pos == #line then
             completions = completeFunction(line)
             if completions and #completions > 0 then
                 currentCompletion = 1
             else
-                currentCompletion = nilg
+                currentCompletion = nil
             end
         else
             completions = nil
@@ -28,22 +35,47 @@ function read(replaceChar, history, completeFunction)
         currentCompletion = nil
     end
 
+    local function updateModifier()
+        modifier = 0
+        if downKeys[keys.leftCtrl] or downKeys[keys.rightCtrl] then modifier = modifier + 1 end
+        if downKeys[keys.leftAlt] or downKeys[keys.rightAlt] then modifier = modifier + 2 end
+    end
+
+    local function nextWord()
+        -- Attempt to find the position of the next word
+        local offset = line:find("%w%W", pos + 1)
+        if offset then return offset else return #line end
+    end
+
+    local function prevWord()
+        -- Attempt to find the position of the previous word
+        local offset = 1
+        while offset <= #line do
+            local nNext = line:find("%W%w", offset)
+            if nNext and nNext < pos then
+                offset = nNext + 1
+            else
+                return offset - 1
+            end
+        end
+    end
+
     local w, h = term.getSize()
     local sx = term.getCursorPos()
 
     local function redraw(clear)
         local scroll = 0
         if sx + pos >= w then
-            scroll =(sx + pos)- w
+            scroll = (sx + pos) - w
         end
 
         local cx,cy = term.getCursorPos()
         term.setCursorPos(sx, cy)
-        local sReplace = clear and " " or replaceChar
-        if sReplace then
-            term.write(string.rep(sReplace, math.max(string.len(line)- scroll, 0)))
+        local replace = (clear and " ") or replaceChar
+        if replace then
+            term.write(replace:rep(math.max(#line - scroll, 0)))
         else
-            term.write(string.sub(line, scroll + 1))
+            term.write(line:sub(scroll + 1))
         end
 
         if currentCompletion then
@@ -53,8 +85,8 @@ function read(replaceChar, history, completeFunction)
                 oldText = term.getTextColor()
                 term.setTextColor(colors.gray)
             end
-            if sReplace then
-                term.write(string.rep(sReplace, string.len(sCompletion)))
+            if replace then
+                term.write(replace:rep(#sCompletion))
             else
                 term.write(sCompletion)
             end
@@ -69,6 +101,9 @@ function read(replaceChar, history, completeFunction)
     local function clear()
         redraw(true)
     end
+
+    recomplete()
+    redraw()
 
     local function acceptCompletion()
         if currentCompletion then
@@ -96,112 +131,53 @@ function read(replaceChar, history, completeFunction)
             line = line .. commonPrefix
             pos = #line
 
+            -- Redraw
             recomplete()
             redraw()
         end
     end
-
-    local mappings = {
-        -- Clear line before cursor
-        [keys.u] = function()
-            clear()
-            historyPos = nil
-            line = line:sub(pos + 1)
-            pos = 0
-            recomplete()
-            redraw()
-        end,
-
-        -- Clear line after cursor
-        [keys.k] = function()
-            clear()
-            historyPos = nil
-            line = line:sub(1, pos)
-            pos = #line
-            recomplete()
-            redraw()
-        end,
-
-        -- Exit
-        [keys.e] = function()
-            line = nil
-
-            return true
-        end,
-
-        -- Ctrl+Left
-        [keys.a] = function()
-            clear()
-            local len = #line
-            if len == 0 then return end
-
-            local oldPos = pos
-            local newPos = 0
-
-            while true do
-                local foundPos = line:find("%s", newPos + 1)
-                if foundPos == nil or foundPos >= oldPos then
-                    break
-                else
-                    newPos = foundPos
-                end
-            end
-
-            pos = newPos
-            recomplete()
-            redraw()
-        end,
-
-        -- Ctrl+Right
-        [keys.d] = function()
-            clear()
-            pos = (line:find("%s", pos + 1)) or #line
-            recomplete()
-            redraw()
-        end,
-    }
-
-    local timers = {}
-
-    recomplete()
-    redraw()
-
     while true do
         local event, param = os.pullEvent()
-        if event == "char" then
-            local char = param:lower()
-            if mappings[keys[char]] then timers[keys[char]] = nil end
-
-            clear()
-
+        if modifier == 0 and event == "char" then
             -- Typed key
-            line = string.sub(line, 1, pos).. param .. string.sub(line, pos + 1)
+            clear()
+            line = string.sub(line, 1, pos) .. param .. string.sub(line, pos + 1)
             pos = pos + 1
-
             recomplete()
             redraw()
 
         elseif event == "paste" then
-            clear()
-
             -- Pasted text
-            line = string.sub(line, 1, pos).. param .. string.sub(line, pos + 1)
-            pos = pos + string.len(param)
-
+            clear()
+            line = string.sub(line, 1, pos) .. param .. string.sub(line, pos + 1)
+            pos = pos + #param
             recomplete()
             redraw()
 
         elseif event == "key" then
-            if mappings[param] then
-                timers[param] = os.startTimer(0)
+            if param == keys.leftCtrl or param == keys.rightCtrl or param == keys.leftAlt or param == keys.rightAlt then
+                downKeys[param] = true
+                updateModifier()
             elseif param == keys.enter then
+                -- Enter
                 if currentCompletion then
                     clear()
                     uncomplete()
                     redraw()
                 end
                 break
-            elseif param == keys.left then
+            elseif modifier == 1 and param == keys.d then
+                -- Enter
+                if currentCompletion then
+                    clear()
+                    uncomplete()
+                    redraw()
+                end
+                line = nil
+                pos = 0
+                break
+            elseif (modifier == 0 and param == keys.left) or (modifier == 1 and param == keys.b) then
+                -- Left
                 if pos > 0 then
                     clear()
                     pos = pos - 1
@@ -209,33 +185,61 @@ function read(replaceChar, history, completeFunction)
                     redraw()
                 end
 
-            elseif param == keys.right then
-                if pos < string.len(line)then
+            elseif (modifier == 0 and param == keys.right) or (modifier == 1 and param == keys.f) then
+                -- Right
+                if pos < #line then
+                    -- Move right
                     clear()
                     pos = pos + 1
                     recomplete()
                     redraw()
                 else
+                    -- Accept autocomplete
                     acceptCompletion()
                 end
 
-            elseif param == keys.up or param == keys.down then
-                clear()
+            elseif modifier == 2 and param == keys.b then
+                -- Word left
+                local nNewPos = prevWord()
+                if nNewPos ~= pos then
+                    clear()
+                    pos = nNewPos
+                    recomplete()
+                    redraw()
+                end
+
+            elseif modifier == 2 and param == keys.f then
+                -- Word right
+                local nNewPos = nextWord()
+                if nNewPos ~= pos then
+                    clear()
+                    pos = nNewPos
+                    recomplete()
+                    redraw()
+                end
+
+            elseif (modifier == 0 and (param == keys.up or param == keys.down)) or (modifier == 1 and (param == keys.p or param == keys.n)) then
+                -- Up or down
                 if currentCompletion then
                     -- Cycle completions
-                    if param == keys.up then
+                    clear()
+                    if param == keys.up or param == keys.p then
                         currentCompletion = currentCompletion - 1
                         if currentCompletion < 1 then
                             currentCompletion = #completions
                         end
-                    elseif param == keys.down then
+                    elseif param == keys.down or param == keys.n then
                         currentCompletion = currentCompletion + 1
                         if currentCompletion > #completions then
                             currentCompletion = 1
                         end
                     end
-                else
-                    if param == keys.up then
+                    redraw()
+
+                elseif history then
+                    -- Cycle history
+                    clear()
+                    if param == keys.up or param == keys.p then
                         -- Up
                         if historyPos == nil then
                             if #history > 0 then
@@ -244,7 +248,7 @@ function read(replaceChar, history, completeFunction)
                         elseif historyPos > 1 then
                             historyPos = historyPos - 1
                         end
-                    else
+                    elseif param == keys.down or param == keys.n then
                         -- Down
                         if historyPos == #history then
                             historyPos = nil
@@ -254,60 +258,114 @@ function read(replaceChar, history, completeFunction)
                     end
                     if historyPos then
                         line = history[historyPos]
-                        pos = string.len(line)
+                        pos = #line
                     else
                         line = ""
                         pos = 0
                     end
-
                     uncomplete()
+                    redraw()
+
                 end
-                redraw()
-            elseif param == keys.backspace then
+
+            elseif modifier == 0 and param == keys.backspace then
+                -- Backspace
                 if pos > 0 then
                     clear()
-                    line = string.sub(line, 1, pos - 1).. string.sub(line, pos + 1)
+                    line = string.sub(line, 1, pos - 1) .. string.sub(line, pos + 1)
                     pos = pos - 1
                     recomplete()
                     redraw()
                 end
-            elseif param == keys.home then
-                clear()
-                pos = 0
-                recomplete()
-                redraw()
-            elseif param == keys.delete then
-                if pos < string.len(line)then
+
+            elseif (modifier == 0 and param == keys.home) or (modifier == 1 and param == keys.a) then
+                -- Home
+                if pos > 0 then
                     clear()
-                    line = string.sub(line, 1, pos).. string.sub(line, pos + 2)
+                    pos = 0
                     recomplete()
                     redraw()
                 end
-            elseif param == keys["end"] then
-                clear()
-                pos = string.len(line)
-                recomplete()
-                redraw()
-            elseif param == keys.tab then
+
+            elseif modifier == 0 and param == keys.delete then
+                -- Delete
+                if pos < #line then
+                    clear()
+                    line = string.sub(line, 1, pos) .. string.sub(line, pos + 2)
+                    recomplete()
+                    redraw()
+                end
+
+            elseif (modifier == 0 and param == keys["end"]) or (modifier == 1 and param == keys.e) then
+                -- End
+                if pos < #line then
+                    clear()
+                    pos = #line
+                    recomplete()
+                    redraw()
+                end
+
+            elseif modifier == 1 and param == keys.u then
+                -- Delete from cursor to beginning of line
+                if pos > 0 then
+                    clear()
+                    line = line:sub(pos + 1)
+                    pos = 0
+                    recomplete()
+                    redraw()
+                end
+
+            elseif modifier == 1 and param == keys.k then
+                -- Delete from cursor to end of line
+                if pos < #line then
+                    clear()
+                    line = line:sub(1, pos)
+                    pos = #line
+                    recomplete()
+                    redraw()
+                end
+
+            elseif modifier == 2 and param == keys.d then
+                -- Delete from cursor to end of next word
+                if pos < #line then
+                    local nNext = nextWord()
+                    if nNext ~= pos then
+                        clear()
+                        line = line:sub(1, pos) .. line:sub(nNext + 1)
+                        recomplete()
+                        redraw()
+                    end
+                end
+
+            elseif modifier == 1 and param == keys.w then
+                -- Delete from cursor to beginning of previous word
+                if pos > 0 then
+                    local nPrev = prevWord(pos)
+                    if nPrev ~= pos then
+                        clear()
+                        line = line:sub(1, nPrev) .. line:sub(pos + 1)
+                        pos = nPrev
+                        recomplete()
+                        redraw()
+                    end
+                end
+
+            elseif modifier == 0 and param == keys.tab then
                 -- Tab (accept autocomplete)
                 acceptCompletion()
-            end
-        elseif event == "timer" then
-            local toCall = nil
-            for key, timer in pairs(timers) do
-                if timer == param then
-                    toCall = mappings[key]
-                    timers[key] = nil
-                    break
-                end
-            end
 
-            if toCall and toCall() then
-                break
+            end
+        elseif event == "key_up" then
+            -- Update the status of the modifier flag
+            if param == keys.leftCtrl or param == keys.rightCtrl or param == keys.leftAlt or param == keys.rightAlt then
+                downKeys[param] = false
+                updateModifier()
             end
         elseif event == "term_resize" then
-            w = term.getSize()
+            -- Terminal resized
+            w, h = term.getSize()
             redraw()
+
         end
     end
 

@@ -515,11 +515,12 @@ else
     local tCommandHistory = session.history
     local maxHistory = clamSettings.maxHistory
 
-    local function redirectRead(char, history, complete)
+    local function redirectRead(...)
         local offset = 0
         local line = nil
+        local args = table.pack(...)
         parallel.waitForAny(
-            function() line = read(char, history, complete) end,
+            function() line = read(table.unpack(args, 1, args.n)) end,
             function()
                 while true do
                     local change = 0
