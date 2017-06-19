@@ -6,7 +6,7 @@ local buffer = grin.getPackageAPI(clamPkg, "buffer")
 local clamPath = grin.resolveInPackage(clamPkg, "clam.lua")
 local interpreter = grin.getPackageAPI(clamPkg, "interpreter")
 local parse = grin.getPackageAPI(clamPkg, "parse")
-local read = grin.getPackageAPI(clamPkg, "readLine").read
+local read = grin.getPackageAPI(clamPkg, "readline").read
 local utils = grin.getPackageAPI(clamPkg, "utils")
 
 if clamPath:sub(1, 1) ~= "/" then clamPath = "/" .. clamPath end
